@@ -35,13 +35,13 @@ lost by stricter str. Existing string-bool extensions ("true", "1") are retained
 However bool handles Boolean/String, NOT Number: tls: 1 omits TLS, skip-cert-verify: 1
 keeps verification enabled. This is a separate existing defect, not a str regression.
 Mihomo ParseProxy uses WeaklyTypedInput; decodeBool accepts nonzero integers as true.
-Thus numeric bools ARE valid mihomo forms. Correcting them changes outbound/id;
-skip-cert-verify also weakens certificate checking as explicitly requested by the input.
-Decision: STOP for owner approval, no numeric-bool correction silently applied.
-SnakeYAML also changes numeric scalar spelling (leading zero/scientific notation) and
-resolves dates before str sees them. Local behavior observed; mihomo parity not proven.
-Do not claim that mihomo preserves original scalar text: its map decoder coerces numbers.
-Tests: supported scalar forms plus golden ids; numeric-bool red tests after approval.
+Numeric bools ARE valid mihomo forms; this app keeps certificate verification enabled
+for numeric skip-cert-verify. Unrecognized numeric TLS omits TLS; D-4 blocks that node
+when no other recognized encryption is configured. Fixing changes outbound/id and can
+lose favorites/custom names/selection on refresh. Owner decision: C remains NO-GO in
+WP-8i; reconsider only if these forms occur in real subscriptions, with explicit id-risk
+approval. Scalar spelling/date conversion observed locally is not proven mihomo parity.
+Tests: supported forms and golden ids; numeric forms document current behavior.
 
 ## D. Hung DNS retains probe permits — confirmed, GO
 
