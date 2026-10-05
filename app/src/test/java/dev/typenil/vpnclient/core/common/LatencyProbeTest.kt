@@ -41,10 +41,10 @@ class LatencyProbeTest {
     }
 
     @Test
-    fun `queued live probes get their own deadline after lingering DNS releases permits`() = runTest {
+    fun `hung lookups release their permits at the deadline so the queue keeps moving`() = runTest {
         var resolved = 0
         val queued = LatencyProbe(VpnSocketProtector(), StandardTestDispatcher(testScheduler)) {
-            if (++resolved <= 8) withContext(NonCancellable) { delay(1_000) }
+            if (++resolved <= 8) withContext(NonCancellable) { delay(10_000) }
             InetAddress.getLoopbackAddress()
         }
         ServerSocket(0, 50).use { server ->
@@ -53,8 +53,40 @@ class LatencyProbeTest {
             assertTrue(results.take(8).all { it == null })
             assertTrue("queued live results=$results", results.drop(8).all { it != null })
             assertEquals(20, resolved)
-            assertEquals(1_000L, testScheduler.currentTime)
+            // Queue waited one deadline for the hung lookups, not their 10 s.
+            assertEquals(100L, testScheduler.currentTime)
         }
+    }
+
+    @Test
+    fun `lookups lingering past the deadline are bounded and fail fast when exhausted`() = runTest {
+        var resolved = 0
+        var running = 0
+        var peak = 0
+        var hang = true
+        val hung = LatencyProbe(VpnSocketProtector(), StandardTestDispatcher(testScheduler)) {
+            resolved++
+            running++
+            peak = maxOf(peak, running)
+            try { if (hang) withContext(NonCancellable) { delay(10_000) } } finally { running-- }
+            InetAddress.getLoopbackAddress()
+        }
+        // Two waves of 8 hung lookups fill the 16-thread budget.
+        List(16) { async { hung.measure("synthetic.example", 443, 100) } }.awaitAll()
+        assertEquals(16, resolved)
+        val before = testScheduler.currentTime
+        // Budget exhausted: no new lookup, answered immediately instead of queueing.
+        assertNull(hung.measure("synthetic.example", 443, 100))
+        assertEquals(16, resolved)
+        assertEquals(before, testScheduler.currentTime)
+        // Lingering lookups end, the budget is reusable.
+        testScheduler.advanceUntilIdle()
+        assertEquals(0, running)
+        hang = false
+        ServerSocket(0).use { server ->
+            assertNotNull(hung.measure("127.0.0.1", server.localPort, 100))
+        }
+        assertTrue("peak=$peak", peak <= 16)
     }
 
     @Test

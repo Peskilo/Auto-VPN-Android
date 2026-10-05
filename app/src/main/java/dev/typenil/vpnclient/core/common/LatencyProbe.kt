@@ -41,6 +41,8 @@ class LatencyProbe internal constructor(
         this(socketProtector, workerDispatcher, Dispatchers.IO, { InetAddress.getByName(it) })
 
     private val permits = Semaphore(MAX_CONCURRENT_PROBES)
+    // ponytail: bounded lingering JVM DNS; use cancellable platform DNS if saturation matters.
+    private val workers = Semaphore(MAX_WORKERS)
 
     /**
      * Milliseconds for a TCP connect to `host:port` (DNS resolution
@@ -54,13 +56,17 @@ class LatencyProbe internal constructor(
         timeoutMs: Int = DEFAULT_TIMEOUT_MS,
     ): Int? = withContext(callerDispatcher) {
         permits.acquire()
-        var workerOwnsPermit = false
+        if (!workers.tryAcquire()) {
+            permits.release()
+            return@withContext null
+        }
+        var workerOwnsCapacity = false
         try {
             withTimeoutOrNull(timeoutMs.toLong()) {
                 suspendCancellableCoroutine { continuation ->
                     val socket = Socket()
                     // Not a child: JVM DNS may ignore cancellation; the caller
-                    // must not join it. The worker retains its permit until done.
+                    // must not join it. Only worker capacity is retained until done.
                     val worker = CoroutineScope(ioDispatcher).launch {
                         try {
                             ensureActive()
@@ -82,9 +88,9 @@ class LatencyProbe internal constructor(
                         }
                     }
                     // Completion also runs if cancellation wins before launch
-                    // enters its body, so every acquired permit is released.
-                    worker.invokeOnCompletion { permits.release() }
-                    workerOwnsPermit = true
+                    // enters its body, so worker capacity is always released.
+                    worker.invokeOnCompletion { workers.release() }
+                    workerOwnsCapacity = true
                     continuation.invokeOnCancellation {
                         runCatching { socket.close() }
                         worker.cancel()
@@ -92,14 +98,16 @@ class LatencyProbe internal constructor(
                 }
             }
         } finally {
+            permits.release() // A timed-out DNS worker must not stall the queue.
             // Timeout/cancellation may prevent the bridge from starting at all.
-            if (!workerOwnsPermit) permits.release()
+            if (!workerOwnsCapacity) workers.release()
         }
     }
 
     companion object {
         const val DEFAULT_TIMEOUT_MS = 3_000
         const val MAX_CONCURRENT_PROBES = 8
-        private val workerDispatcher = Dispatchers.IO.limitedParallelism(MAX_CONCURRENT_PROBES)
+        private const val MAX_WORKERS = MAX_CONCURRENT_PROBES * 2
+        private val workerDispatcher = Dispatchers.IO.limitedParallelism(MAX_WORKERS)
     }
 }
