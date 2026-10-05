@@ -1,62 +1,60 @@
 # Parser and probe hardening (WP-8i)
+Audit at fe57593. Identity hashes the tagless outbound: changing it on refresh can lose
+favorites, custom names and selection. No such correction without explicit approval.
 
-Audit of four backlog items at HEAD fe57593. Rule: no change that alters `stableNodeId`
-(hash of the tagless outbound) without the owner's agreement: a changed id drops the
-node's favorite flag, custom name and selection after the next refresh. Synthetic forms
-only; raw output of the audit run: `.pi/wp8i/explore-clash-forms.txt` (local).
+## A. Clash ws-opts.host fallback — confirmed, NO-GO
 
-## A. Clash `ws-opts.host` as SNI fallback — confirmed, NO-GO
+`clashServerName` reads headers.Host / headers.host / ws-opts.host; ws transport reads
+only headers. Host-only alias therefore affects SNI but not the WebSocket Host header.
+Mihomo WSOptions has no host field: explicit servername wins, then headers.Host, then
+server address. Sing-box WebSocket also overrides request Host only from headers.Host.
+WP-2 added explicit SNI -> transport-host fallback; WP-2b removed redundant server-domain
+SNI while retaining transport-host fallback. Standard headers.Host forms remain correct.
+Recommendation: remove only the ws-opts.host SNI alias, not headers.Host fallback.
+Risk: alias-only forms change SNI and id; NO-GO pending owner approval.
+URI host= already supplies transport Host and fallback SNI; explicit SNI wins.
+Sing-box JSON preserves explicit fields, without this parser's SNI inference.
+Tests: golden ids for standard Host, alias-only, explicit SNI and URI/JSON forms.
 
-- `clashServerName` reads `ws-opts.headers.Host`, `headers.host`, then `ws-opts.host`.
-  `clashTransport("ws")` reads only the two header spellings. For a node that has only
-  `ws-opts.host` (no servername/sni) the SNI becomes that host while the ws `Host`
-  header stays the server address: the two disagree.
-- sing-box `v2raywebsocket` takes the Host only from `headers["Host"]`; mihomo's `ws-opts`
-  has `path`, `headers`, `max-early-data`, `early-data-header-name`, no `host`. So the key
-  is a non-standard alias; URI (`host=` is the ws Host and the SNI fallback, Xray
-  convention) and sing-box JSON (no fallback at all) are already consistent.
-- Fix would be: drop the `ws-opts.host` token for `ws` (matches mihomo; `httpupgrade`
-  keeps it because its transport reads it too). Effect: SNI for that form changes
-  host -> core default (server), so the id changes. Affects only non-standard nodes.
-- Decision: NO-GO until the owner accepts the one-off id change for that form
-  (alternative: also send the alias as the ws Host header; also changes the id).
-  Tests: pin the current ids and outbound for standard and alias forms.
+## B. Blank h2/http host/path — confirmed for Clash H2, NO-GO
 
-## B. Blank h2 / http host and path — NO-GO
+URI commaList trims/drops blank hosts; blank HTTP/H2 path is omitted: no fix needed.
+Clash H2 host: "" emits [""], mixed lists retain blanks, path: "" emits empty path.
+Clash network:http is intentionally skipped (HTTP obfuscation is not native H2).
+Pinned sing-box makes empty HTTP path '/': normalizing it buys no wire behavior.
+For HTTP/2 an absent host list defaults to www.example.com; a supplied blank element
+is assigned verbatim to request.Host, letting Go HTTP use URL authority instead.
+Cleaning blanks can therefore change authority as well as id. NO-GO until agreed.
+Tests: pin URI filtering, ordinary Clash lists and existing blank-form ids.
 
-- URI: `commaList` trims and drops blanks, blank path is omitted. Correct, pinned.
-- Clash `network: h2`: `host: ""` gives `[""]`, `host: ["", a]` keeps the blank
-  element, `path: ""` gives `""`. (`network: http` is skipped since WP-2.)
-- sing-box (`v2rayhttp`): path without leading `/` gets one, so `""` equals `/`: no
-  behavior gain from cleaning. A blank host list element makes Go use the dial address as
-  authority, an omitted list makes it `www.example.com`: unclear which one the provider
-  meant, and either cleaning changes the id. Decision: NO-GO, characterization tests only.
+## C. Map.str — scalar compatibility retained; numeric bool defect, NO-GO
 
-## C. `Map.str` strictness — confirmed safe, tests only
+str accepts String/Number/Boolean, rejecting only structured List/Map. Checked forms
+port: "443" or 443, tls: true or "true", alterId: "0" or 0 still parse; they are not
+lost by stricter str. Existing string-bool extensions ("true", "1") are retained.
+However bool handles Boolean/String, NOT Number: tls: 1 omits TLS, skip-cert-verify: 1
+keeps verification enabled. This is a separate existing defect, not a str regression.
+Mihomo ParseProxy uses WeaklyTypedInput; decodeBool accepts nonzero integers as true.
+Thus numeric bools ARE valid mihomo forms. Correcting them changes outbound/id;
+skip-cert-verify also weakens certificate checking as explicitly requested by the input.
+Decision: STOP for owner approval, no numeric-bool correction silently applied.
+SnakeYAML also changes numeric scalar spelling (leading zero/scientific notation) and
+resolves dates before str sees them. Local behavior observed; mihomo parity not proven.
+Do not claim that mihomo preserves original scalar text: its map decoder coerces numbers.
+Tests: supported scalar forms plus golden ids; numeric-bool red tests after approval.
 
-- `str` returns String, Number and Boolean text; List and Map give null (before 132182d
-  they were stringified into garbage). Forms checked: `port: "443"`, `443.0`, `tls: true |
-  "true" | "True" | yes | on`, `alterId: "0" | 0 | ""`, `skip-cert-verify: "true" | "1" |
-  yes`, numeric `name`, `password`, `short-id`, `obfs-password`, `alpn` list or string: all
-  parse as before. Nothing valid is dropped by the strictness itself.
-- Not valid for mihomo, therefore left alone: `tls: 1` (silently no TLS, WP-8e then blocks
-  it), `skip-cert-verify: 1` or `"yes"` (stays verified: secure default; accepting would
-  flip security and the id).
-- New finding E (NO-GO, needs the owner): SnakeYAML resolves unquoted scalars before we
-  see them: `short-id: 01234567` -> `342391`, `password: 0123` -> `83`, `1e3` ->
-  `1000.0`, `2024-01-01` -> node skipped. mihomo keeps the text. Fixing keeps text for int,
-  float and timestamp scalars; it changes ids of the (already non-working) nodes.
-- Tests: golden ids and values for the checked forms.
+## D. Hung DNS retains probe permits — confirmed, GO
 
-## D. LatencyProbe permit held by a hung DNS lookup — GO
-
-- Today the worker keeps its permit until the lookup returns (WP-3b: bounded threads). 8
-  hung lookups (dead resolver, 5-30 s) stall every later measurement.
-- Change: the permit covers only the attempt's own deadline and is released in `finally`.
-  A separate budget of 16 threads (8 active + up to 8 lingering past the deadline) is taken
-  before the worker starts and released when it ends; when exhausted the probe returns
-  null at once instead of queueing. Thread count stays bounded (<= 16), no new threads
-  per call, TCP/protect/cancellation behavior unchanged. Dispatcher parallelism raised
-  from 8 to 16 to match.
-- Tests: queue is not stalled by hung lookups (red now), budget exhaustion fails fast, a
-  released permit is reusable, workers are bounded.
+WP-3b keeps each worker permit until completion. Eight uninterruptible DNS calls can
+stall the entire queued batch past the per-attempt deadline. Queue wait has no deadline.
+Minimal proposal: release attempt permits at timeout/cancellation; separately bound
+active-plus-lingering workers to 16, acquire worker capacity without waiting, return null
+when saturated. Completion releases worker capacity; dispatcher parallelism matches it.
+No new per-call threads; cancellation closes sockets, cancelled DNS never connects.
+TCP/protect and connected-mode engine urltest semantics stay unchanged. Tests: queue
+progress after deadline, bounded lingering workers, fast saturation, capacity reuse.
+Original-production red run: 10 tests, 2 assertion failures, 0 errors/skipped.
+## Primary sources
+- [Mihomo parser/decoder](https://github.com/MetaCubeX/mihomo/tree/Meta/common/structure)
+- [Mihomo WSOptions](https://github.com/MetaCubeX/mihomo/blob/Meta/adapter/outbound/vmess.go)
+- [sing-box 1.14.1 transports](https://github.com/SagerNet/sing-box/tree/v1.14.1/transport)
