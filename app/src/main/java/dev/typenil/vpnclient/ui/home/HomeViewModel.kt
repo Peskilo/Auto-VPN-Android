@@ -145,19 +145,15 @@ class HomeViewModel
         /** The last terminal error the state machine published this process —
          *  the cheapest honest source for the sheet's "last error" row. */
         private val lastErrorMessage = MutableStateFlow<VpnError?>(null)
-        private val batteryEnabled = MutableStateFlow<Boolean?>(null)
-        val batteryHintVisible = combine(connectionManager.state, batteryEnabled, settings.batteryHintDismissed) { state, enabled, dismissed ->
-            dev.typenil.vpnclient.ui.common.showBatteryHint(state, enabled, dismissed)
-        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+        private val batteryHint = dev.typenil.vpnclient.ui.common.BatteryHintModel(
+            viewModelScope, connectionManager.state, settings.batteryHintDismissed, batteryStatus, settings::dismissBatteryHint,
+        )
+        val batteryHintVisible = batteryHint.visible
 
-        fun refreshBatteryStatus() { batteryEnabled.value = batteryStatus.enabled() }
+        fun refreshBatteryStatus() = batteryHint.refresh()
 
         fun dismissBatteryHint() {
-            viewModelScope.launch {
-                try { settings.dismissBatteryHint() } catch (_: java.io.IOException) {
-                    // Keep the card: a failed write is not a persisted dismissal.
-                }
-            }
+            batteryHint.dismiss()
         }
 
         init {
