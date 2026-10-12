@@ -66,7 +66,10 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -111,6 +114,7 @@ fun SubscriptionsScreen(
 ) {
     val ui by viewModel.uiState.collectAsStateWithLifecycle()
     val hwidPrompt by viewModel.hwidPrompt.collectAsStateWithLifecycle()
+    val addStatus by viewModel.addStatus.collectAsStateWithLifecycle()
     val globalAutoRefresh by viewModel.globalAutoRefreshMinutes.collectAsStateWithLifecycle()
     val context = LocalContext.current
     var showAddDialog by rememberSaveable { mutableStateOf(false) }
@@ -238,20 +242,27 @@ fun SubscriptionsScreen(
             allowInsecure = dialogAllowInsecure,
             onAllowInsecureChange = { dialogAllowInsecure = it },
             onScanQr = onScanQr,
+            status = addStatus,
             onDismiss = {
+                viewModel.clearAddStatus()
                 showAddDialog = false
                 dialogUrl = ""
                 dialogName = ""
                 dialogAllowInsecure = false
             },
-            onConfirm = { url, name, allowInsecure ->
-                showAddDialog = false
-                dialogUrl = ""
-                dialogName = ""
-                dialogAllowInsecure = false
-                viewModel.add(url, name, allowInsecure)
-            },
+            // The dialog stays open until the add succeeds, so a failure is
+            // shown next to the fields the user can fix.
+            onConfirm = { url, name, allowInsecure -> viewModel.add(url, name, allowInsecure) },
         )
+    }
+    LaunchedEffect(addStatus) {
+        if (addStatus == AddStatus.Succeeded) {
+            showAddDialog = false
+            dialogUrl = ""
+            dialogName = ""
+            dialogAllowInsecure = false
+            viewModel.clearAddStatus()
+        }
     }
 
     if (hwidPrompt) {
@@ -492,10 +503,12 @@ private fun AddSubscriptionDialog(
     onNameChange: (String) -> Unit,
     allowInsecure: Boolean,
     onAllowInsecureChange: (Boolean) -> Unit,
+    status: AddStatus,
     onDismiss: () -> Unit,
     onConfirm: (url: String, name: String?, allowInsecure: Boolean) -> Unit,
     onScanQr: () -> Unit,
 ) {
+    val working = status == AddStatus.Working
     // Stateless: fields live in the caller's saveable state so a QR result
     // fills the open dialog in place instead of recreating it.
     val isHttp = url.trim().startsWith("http://", ignoreCase = true)
@@ -506,6 +519,7 @@ private fun AddSubscriptionDialog(
         text = {
             // Scrollable: landscape/large fonts must still reach the actions.
             Column(Modifier.verticalScroll(rememberScrollState())) {
+                (status as? AddStatus.Failed)?.failure?.let { AddFailureBlock(it) }
                 // Where the request goes, large: the field below shows the whole
                 // URL (token included) and is not masked, so the host is easy to miss.
                 subscriptionHost(url)?.let { host ->
@@ -589,15 +603,47 @@ private fun AddSubscriptionDialog(
         confirmButton = {
             TextButton(
                 onClick = { onConfirm(url.trim(), name.trim().ifEmpty { null }, allowInsecure) },
-                enabled = url.isNotBlank() && (!isHttp || allowInsecure),
+                enabled = url.isNotBlank() && (!isHttp || allowInsecure) && !working,
             ) {
-                Text(stringResource(R.string.subs_add))
+                Text(stringResource(if (working) R.string.subs_adding else R.string.subs_add))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) }
         },
     )
+}
+
+/** Failure reason at the top of the add dialog; announced politely to screen readers. */
+@Composable
+private fun AddFailureBlock(failure: AddFailure) {
+    Column(
+        Modifier
+            .padding(bottom = 12.dp)
+            .semantics { liveRegion = LiveRegionMode.Polite },
+    ) {
+        Text(
+            stringResource(failure.kind.textRes),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.error,
+        )
+        failure.httpCode?.let {
+            Text(
+                stringResource(R.string.subs_add_err_code, it),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        failure.providerMessage?.let {
+            Spacer(Modifier.height(4.dp))
+            Text(
+                stringResource(R.string.subs_add_err_provider),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(it, style = MaterialTheme.typography.bodySmall)
+        }
+    }
 }
 
 /**

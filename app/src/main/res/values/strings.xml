@@ -443,7 +443,6 @@
     <string name="subs_nodes_skipped">Servers skipped: %1$d: %2$s</string>
     <string name="subs_nodes_skipped_more">Servers skipped: %1$d: %2$s, +%3$d more</string>
     <string name="subs_xray_json_unsupported">Xray JSON subscriptions are not supported. In your panel, select sing-box, Clash, or base64/share links.</string>
-    <string name="subs_add_failed">Failed to add</string>
     <string name="subs_refresh_failed">Refresh failed</string>
     <string name="subs_update_failed">Failed to update subscription</string>
     <string name="subs_rename_failed">Rename failed</string>
@@ -501,4 +500,20 @@
     <string name="battery_hint_open">Open battery settings</string>
     <string name="battery_hint_dismiss">Dismiss background-work hint</string>
     <string name="battery_hint_unavailable">This screen is unavailable. Review this app’s battery options manually in system settings.</string>
+    <string name="subs_add_err_limit">This provider says the device limit is reached. Remove an old device in the provider\'s panel or ask the provider to raise the limit, then try again.</string>
+    <string name="subs_add_err_hwid_required">This provider needs a valid device ID (HWID) and refused the request. Check the HWID setting or contact the provider.</string>
+    <string name="subs_add_err_hwid_off">HWID sending is off, and this provider refused the request without it. Turn it on in settings or contact the provider.</string>
+    <string name="subs_add_err_hwid_unclear">The provider rejected the device identification. A device limit is not confirmed; contact the provider.</string>
+    <string name="subs_add_err_expired">This subscription has expired. Renew it with the provider and try again.</string>
+    <string name="subs_add_err_used_up">The traffic on this subscription is used up. Top it up with the provider and try again.</string>
+    <string name="subs_add_err_http">The server refused the request. Check the link, or contact the provider.</string>
+    <string name="subs_add_err_network">Can\'t reach the server. Check your internet connection and try again.</string>
+    <string name="subs_add_err_timeout">The server took too long to answer. Try again in a moment.</string>
+    <string name="subs_add_err_invalid">The server answered, but no usable servers were found. Check that the link is correct and its format is supported.</string>
+    <string name="subs_add_err_insecure">This link isn\'t allowed: it uses an unprotected or local address. Use an https link.</string>
+    <string name="subs_add_err_bad_address">This doesn\'t look like a valid web address. Check the link.</string>
+    <string name="subs_add_err_other">Couldn\'t add the subscription. Try again.</string>
+    <string name="subs_add_err_code">Server response: HTTP %1$d</string>
+    <string name="subs_add_err_provider">Message from provider</string>
+    <string name="subs_adding">Adding…</string>
 </resources>

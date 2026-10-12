@@ -327,26 +327,59 @@ class SubscriptionsViewModelTest {
         }
 
     @Test
-    fun `a failed add leaves a durable pending message`() =
+    fun `a failed add reports inside the dialog state and posts no snackbar`() =
         testScope.runTest {
             collectUi()
 
             viewModel.add("not a url", null)
             advanceUntilIdle()
 
-            assertEquals(
-                "bad url",
-                viewModel.uiState.value.pendingMessage
-                    ?.body?.fallback,
-            )
+            assertEquals(AddStatus.Failed(AddFailure(AddFailureKind.BadAddress)), viewModel.addStatus.value)
+            assertNull(viewModel.uiState.value.pendingMessage)
         }
+
+    @Test
+    fun `a rejected consent read fails the add instead of hanging in Working`() =
+        testScope.runTest {
+            collectUi()
+            val failing = object : SubscriptionSettings by FakeSettings() {
+                override val hwidConsent: Flow<dev.typenil.vpnclient.core.subscription.HwidConsent> =
+                    kotlinx.coroutines.flow.flow { throw java.io.IOException("synthetic") }
+            }
+            viewModel = SubscriptionsViewModel(newRepository(FakeNodeDao()), failing, FakeNodeDao())
+
+            viewModel.add("https://example.test/sub", null)
+            advanceUntilIdle()
+
+            assertEquals(AddStatus.Failed(AddFailure(AddFailureKind.Other)), viewModel.addStatus.value)
+        }
+
+    @Test
+    fun `clearAddStatus returns to Idle`() =
+        testScope.runTest {
+            collectUi()
+            viewModel.add("not a url", null)
+            advanceUntilIdle()
+
+            viewModel.clearAddStatus()
+
+            assertEquals(AddStatus.Idle, viewModel.addStatus.value)
+        }
+
+    /** A snackbar message source that doesn't depend on add failures. */
+    private fun kotlinx.coroutines.test.TestScope.postCancelledPromptMessage() {
+        settings.hwidConsent.value = dev.typenil.vpnclient.core.subscription.HwidConsent.Unset
+        viewModel.add("http://127.0.0.1/synthetic", null, true)
+        advanceUntilIdle()
+        viewModel.cancelHwidPrompt()
+        advanceUntilIdle()
+    }
 
     @Test
     fun `acknowledgeMessage clears the pending message`() =
         testScope.runTest {
             collectUi()
-            viewModel.add("not a url", null)
-            advanceUntilIdle()
+            postCancelledPromptMessage()
 
             viewModel.acknowledgeMessage(
                 viewModel.uiState.value.pendingMessage!!
@@ -361,16 +394,13 @@ class SubscriptionsViewModelTest {
     fun `a second failure replaces the pending message with a new id`() =
         testScope.runTest {
             collectUi()
-            viewModel.add("not a url", null)
-            advanceUntilIdle()
+            postCancelledPromptMessage()
             val first = viewModel.uiState.value.pendingMessage!!
 
-            viewModel.add("http://insecure.example/sub", null)
-            advanceUntilIdle()
+            postCancelledPromptMessage()
 
             val second = viewModel.uiState.value.pendingMessage!!
             assertNotEquals(first.id, second.id)
-            assertEquals("insecure transport not allowed for this subscription", second.body.fallback)
         }
 
     @Test
@@ -498,6 +528,7 @@ class SubscriptionsViewModelTest {
                         ?.body?.fallback
                 assertTrue(text!!.startsWith("2 nodes skipped:"))
                 assertTrue("unsupported protocol: snell (2)" in text)
+                assertEquals(AddStatus.Succeeded, viewModel.addStatus.value)
             } finally {
                 server.shutdown()
             }
@@ -513,16 +544,11 @@ class SubscriptionsViewModelTest {
                 server.enqueue(MockResponse().setBody("""{"outbounds":[{"protocol":"vless","settings":{}}]}"""))
                 viewModel.add(server.url("/synthetic").toString(), null, allowInsecureHttp = true)
                 val deadline = System.currentTimeMillis() + 5_000
-                while (viewModel.uiState.value.pendingMessage == null && System.currentTimeMillis() < deadline) {
+                while (viewModel.addStatus.value !is AddStatus.Failed && System.currentTimeMillis() < deadline) {
                     advanceUntilIdle()
                     Thread.sleep(20)
                 }
-                val message = viewModel.uiState.value.pendingMessage?.body
-                assertTrue(message is dev.typenil.vpnclient.ui.common.UserMessage.Resource)
-                assertEquals(
-                    "Xray JSON subscriptions are not supported. In your panel, select sing-box, Clash, or base64/share links.",
-                    message?.fallback,
-                )
+                assertEquals(AddStatus.Failed(AddFailure(AddFailureKind.InvalidResponse)), viewModel.addStatus.value)
             } finally {
                 server.shutdown()
             }
@@ -570,9 +596,8 @@ class SubscriptionsViewModelTest {
             for (raw in listOf("plain text")) {
                 viewModel.add(raw, null)
                 advanceUntilIdle()
-                assertTrue(viewModel.uiState.value.pendingMessage != null)
-                viewModel.acknowledgeMessage(viewModel.uiState.value.pendingMessage!!.id)
-                advanceUntilIdle()
+                assertTrue(viewModel.addStatus.value is AddStatus.Failed)
+                viewModel.clearAddStatus()
             }
             val server = MockWebServer()
             try {
@@ -581,11 +606,11 @@ class SubscriptionsViewModelTest {
                 val candidate = ImportUrlExtractor.extract(null, server.url("/page").toString(), null)!!
                 viewModel.add(candidate.url, null, allowInsecureHttp = true)
                 val deadline = System.currentTimeMillis() + 5_000
-                while (viewModel.uiState.value.pendingMessage == null && System.currentTimeMillis() < deadline) {
+                while (viewModel.addStatus.value !is AddStatus.Failed && System.currentTimeMillis() < deadline) {
                     advanceUntilIdle()
                     Thread.sleep(20)
                 }
-                assertTrue(viewModel.uiState.value.pendingMessage != null)
+                assertTrue(viewModel.addStatus.value is AddStatus.Failed)
                 assertEquals(0, validatorCalls)
                 assertTrue(nodeDao.nodes.isEmpty())
                 // The repository retains a failed subscription row for retry;
@@ -636,11 +661,7 @@ class SubscriptionsViewModelTest {
             viewModel.add("http://insecure.example/sub", null)
             advanceUntilIdle()
 
-            assertEquals(
-                "insecure transport not allowed for this subscription",
-                viewModel.uiState.value.pendingMessage
-                    ?.body?.fallback,
-            )
+            assertEquals(AddStatus.Failed(AddFailure(AddFailureKind.Insecure)), viewModel.addStatus.value)
             assertTrue(nodeDao.nodes.isEmpty())
         }
 

@@ -452,7 +452,6 @@
     <string name="subs_nodes_skipped">Пропущено серверов: %1$d: %2$s</string>
     <string name="subs_nodes_skipped_more">Пропущено серверов: %1$d: %2$s, +ещё %3$d</string>
     <string name="subs_xray_json_unsupported">Подписка в формате Xray JSON не поддерживается. В панели выберите формат sing-box, Clash или base64/ссылки</string>
-    <string name="subs_add_failed">Не удалось добавить</string>
     <string name="subs_refresh_failed">Не удалось обновить</string>
     <string name="subs_update_failed">Не удалось обновить подписку</string>
     <string name="subs_rename_failed">Не удалось переименовать</string>
@@ -510,4 +509,20 @@
     <string name="battery_hint_open">Открыть настройки батареи</string>
     <string name="battery_hint_dismiss">Закрыть подсказку о работе в фоне</string>
     <string name="battery_hint_unavailable">Этот экран недоступен. Проверьте параметры батареи для приложения вручную в системных настройках.</string>
+    <string name="subs_add_err_limit">Провайдер сообщает, что достигнут лимит устройств. Удалите старое устройство в панели провайдера или попросите увеличить лимит, затем повторите.</string>
+    <string name="subs_add_err_hwid_required">Провайдеру нужен корректный идентификатор устройства (HWID), и он отклонил запрос. Проверьте настройку HWID или обратитесь к провайдеру.</string>
+    <string name="subs_add_err_hwid_off">Отправка HWID выключена, и провайдер отклонил запрос без него. Включите её в настройках или обратитесь к провайдеру.</string>
+    <string name="subs_add_err_hwid_unclear">Провайдер отклонил идентификацию устройства. Лимит устройств не подтверждён; обратитесь к провайдеру.</string>
+    <string name="subs_add_err_expired">Срок действия подписки истёк. Продлите её у провайдера и повторите.</string>
+    <string name="subs_add_err_used_up">Трафик по подписке исчерпан. Пополните его у провайдера и повторите.</string>
+    <string name="subs_add_err_http">Сервер отклонил запрос. Проверьте ссылку или обратитесь к провайдеру.</string>
+    <string name="subs_add_err_network">Не удаётся связаться с сервером. Проверьте подключение к интернету и повторите.</string>
+    <string name="subs_add_err_timeout">Сервер слишком долго отвечает. Повторите чуть позже.</string>
+    <string name="subs_add_err_invalid">Сервер ответил, но подходящих серверов не нашлось. Проверьте ссылку и поддерживаемый формат.</string>
+    <string name="subs_add_err_insecure">Эта ссылка не разрешена: она ведёт на незащищённый или локальный адрес. Используйте https-ссылку.</string>
+    <string name="subs_add_err_bad_address">Это не похоже на корректный веб-адрес. Проверьте ссылку.</string>
+    <string name="subs_add_err_other">Не удалось добавить подписку. Повторите попытку.</string>
+    <string name="subs_add_err_code">Ответ сервера: HTTP %1$d</string>
+    <string name="subs_add_err_provider">Сообщение от провайдера</string>
+    <string name="subs_adding">Добавление…</string>
 </resources>

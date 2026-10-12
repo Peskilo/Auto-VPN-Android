@@ -18,6 +18,7 @@ import dev.typenil.vpnclient.data.db.NodeDao
 import dev.typenil.vpnclient.data.db.NodeEntity
 import dev.typenil.vpnclient.ui.common.UserMessage
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -35,6 +36,14 @@ data class PendingMessage(
     val id: Long,
     val body: UserMessage,
 )
+
+/** State of the add dialog's request; failures stay inside the dialog. */
+sealed interface AddStatus {
+    data object Idle : AddStatus
+    data object Working : AddStatus
+    data class Failed(val failure: AddFailure) : AddStatus
+    data object Succeeded : AddStatus
+}
 
 data class SubscriptionsUiState(
     val profiles: List<SubscriptionProfile> = emptyList(),
@@ -58,6 +67,18 @@ class SubscriptionsViewModel
         private val pendingMessage = MutableStateFlow<PendingMessage?>(null)
 
         private val refreshing = MutableStateFlow<Set<Long>>(emptySet())
+
+        private val _addStatus = MutableStateFlow<AddStatus>(AddStatus.Idle)
+        val addStatus: StateFlow<AddStatus> = _addStatus
+        private var addJob: Job? = null
+
+        /** The dialog was closed or its result consumed; an in-flight add is
+         *  cancelled (the repository rolls the unfinished row back). */
+        fun clearAddStatus() {
+            addJob?.cancel()
+            addJob = null
+            _addStatus.value = AddStatus.Idle
+        }
 
         val uiState: StateFlow<SubscriptionsUiState> =
             combine(
@@ -177,11 +198,12 @@ class SubscriptionsViewModel
         fun cancelHwidPrompt() {
             if (pendingImport == null && !_hwidPrompt.value) return
             dismissHwidPrompt()
+            _addStatus.value = AddStatus.Idle
             postMessage(R.string.subs_not_added, "Subscription not added")
         }
 
         fun chooseHwidConsent(allowed: Boolean) {
-            viewModelScope.launch {
+            addJob = viewModelScope.launch {
                 val pending = pendingImport ?: return@launch
                 dismissHwidPrompt()
                 try {
@@ -191,7 +213,7 @@ class SubscriptionsViewModel
                 } catch (_: Exception) {
                     pendingImport = pending
                     _hwidPrompt.value = true
-                    postMessage(R.string.subs_add_failed, "Failed to add")
+                    _addStatus.value = AddStatus.Failed(AddFailure(AddFailureKind.Other))
                     return@launch
                 }
                 performAdd(pending.url, pending.name, pending.insecure)
@@ -203,7 +225,9 @@ class SubscriptionsViewModel
             requestedName: String?,
             allowInsecureHttp: Boolean = false,
         ) {
-            viewModelScope.launch {
+            if (_addStatus.value == AddStatus.Working) return
+            _addStatus.value = AddStatus.Working
+            addJob = viewModelScope.launch {
                 val candidate = ImportUrlExtractor.extract(null, url.trim(), null)
                 val needsConsent = try {
                     candidate?.kind == ImportUrlExtractor.Kind.Subscription &&
@@ -211,11 +235,12 @@ class SubscriptionsViewModel
                 } catch (e: CancellationException) {
                     throw e
                 } catch (_: Exception) {
-                    postMessage(R.string.subs_add_failed, "Failed to add")
+                    _addStatus.value = AddStatus.Failed(AddFailure(AddFailureKind.Other))
                     return@launch
                 }
                 if (needsConsent) {
                     pendingImport = PendingImport(url, requestedName, allowInsecureHttp)
+                    _addStatus.value = AddStatus.Idle
                     _hwidPrompt.value = true
                 } else {
                     performAdd(url, requestedName, allowInsecureHttp)
@@ -241,8 +266,9 @@ class SubscriptionsViewModel
                     if (outcome.skipped.isNotEmpty()) {
                         skippedSummary(outcome.skipped)
                     }
+                    _addStatus.value = AddStatus.Succeeded
                 }.onFailure {
-                    postSubscriptionFailure(it, R.string.subs_add_failed, "Failed to add")
+                    _addStatus.value = AddStatus.Failed(addFailureOf(it))
                 }
         }
 
