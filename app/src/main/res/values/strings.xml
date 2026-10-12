@@ -225,7 +225,7 @@
     <string name="servers_connection_blocked">Connection blocked</string>
     <string name="home_selection_unencrypted">Couldn\'t switch to this server: it isn\'t encrypted. The connection is still running on the previous server.</string>
     <string name="servers_unencrypted">Unencrypted</string>
-    <string name="servers_local_sidecar">Exception for a server on this device</string>
+    <string name="servers_local_sidecar">Local server on this device — allowed without encryption</string>
     <string name="home_error_unencrypted">Unencrypted connections to remote servers are blocked. Choose an encrypted server or one running on this device.</string>
     <string name="home_error_no_node">No server selected — pick one in Servers</string>
     <string name="home_error_config">Invalid configuration: %1$s</string>
