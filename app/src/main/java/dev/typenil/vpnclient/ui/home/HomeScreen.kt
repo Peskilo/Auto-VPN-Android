@@ -124,8 +124,11 @@ fun HomeScreen(
                 dev.typenil.vpnclient.ui.common.BatteryHintCard(onDismiss = viewModel::dismissBatteryHint)
             }
         },
-        errorMessage = (connection as? VpnConnectionState.Error)?.let { errorText(it.error) }
-            ?: ui.selectionError?.let { stringResource(R.string.home_selection_unencrypted) },
+        errorMessage = when (val notice = ui.notice()) {
+            is HomeNotice.Failure -> errorText(notice.error)
+            is HomeNotice.SelectionRejected -> stringResource(R.string.home_selection_unencrypted)
+            null -> null
+        },
     )
     if (showPicker) {
         ServerPickerSheet(

@@ -319,7 +319,7 @@ private fun ConnectionAction(state: VisualState, noServers: Boolean, onConnect: 
     // Subtitle only for stable states; transitional states already name the
     // action in the title, so a static "VPN OFF/ON" subtitle would misreport.
     val subtitle = when {
-        noServers -> stringResource(R.string.afterglow_no_servers_headline)
+        noServers -> null // hero + card already say it; the title is the action
         state == VisualState.Connected -> stringResource(R.string.afterglow_online)
         state == VisualState.Offline -> stringResource(R.string.afterglow_offline)
         else -> null
@@ -499,16 +499,16 @@ private fun ServerAndRouting(ui: HomeUiState, onPick: () -> Unit, onAdd: () -> U
             ?.substringAfter("→", "")?.trim()?.takeIf { it.isNotBlank() }
     } else null
     val title = when {
-        noServers -> stringResource(R.string.common_no_servers_yet)
+        // The hero already says "No servers"; the card carries the one action hint.
+        noServers -> stringResource(
+            if (ui.noNodesAtAll) R.string.common_add_servers_hint else R.string.afterglow_no_usable_servers,
+        )
         autoResolved != null -> autoResolved
         ui.autoSelected -> stringResource(R.string.home_auto_subtitle)
         else -> ui.selectedNodeName ?: live?.name ?: stringResource(R.string.home_no_server_selected)
     }
     val protocolLabel = if (ui.autoSelected) null else (ui.selectedNodeProtocol ?: live?.protocol?.label)
         ?.takeIf { it.isNotBlank() && !it.equals("Other", ignoreCase = true) }
-    val emptyHint = if (noServers) stringResource(
-        if (ui.noNodesAtAll) R.string.common_add_servers_hint else R.string.afterglow_no_usable_servers,
-    ) else null
     val card = Modifier.fillMaxWidth().clip(AfterglowTokens.cardShape)
         .border(1.dp, colors.border, AfterglowTokens.cardShape).background(colors.paperSecondary)
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -530,8 +530,6 @@ private fun ServerAndRouting(ui: HomeUiState, onPick: () -> Unit, onAdd: () -> U
                 }
                 Text(title, color = colors.ink, fontWeight = FontWeight.Bold, fontSize = 17.sp,
                     lineHeight = 22.sp, maxLines = 3, overflow = TextOverflow.Ellipsis)
-                if (emptyHint != null) Text(emptyHint, color = colors.muted, fontSize = 12.sp,
-                    modifier = Modifier.padding(top = 4.dp))
             }
             CircledChevron()
         }
@@ -799,9 +797,11 @@ private fun StatusNotice(message: String, onClick: () -> Unit, error: Boolean) {
     Column(Modifier.fillMaxWidth().background(if (error) colors.errorSurface else colors.paperSecondary)
         .semantics { role = Role.Button }
         .clickable(onClick = onClick).padding(16.dp)) {
-        Text(if (error) stringResource(R.string.home_status_failed) else stringResource(R.string.afterglow_restart_guard_title),
+        // An error notice never repeats the hero headline ("Connection failed"):
+        // the hero names the state, the notice carries only the reason and action.
+        if (!error) Text(stringResource(R.string.afterglow_restart_guard_title),
             color = colors.ink, fontWeight = FontWeight.Bold)
-        Text(message, color = colors.ink, fontSize = 14.sp, modifier = Modifier.padding(top = 4.dp))
+        Text(message, color = colors.ink, fontSize = 14.sp, modifier = Modifier.padding(top = if (error) 0.dp else 4.dp))
         Text(stringResource(if (error) R.string.afterglow_open_diagnostics else R.string.common_dismiss),
             color = colors.coral, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp))
     }
