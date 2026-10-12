@@ -47,7 +47,7 @@ private fun scheme(colors: AfterglowPalette, dark: Boolean, personalizedInverse:
         surfaceBright = colors.paper,
         surfaceDim = colors.paperSecondary,
         surfaceTint = colors.coral,
-        outline = colors.border,
+        outline = colors.borderStrong,
         outlineVariant = colors.border,
         error = colors.error,
         onError = colors.onInk,

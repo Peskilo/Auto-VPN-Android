@@ -214,7 +214,7 @@ internal fun ServerPickerSheet(
                 shape = AfterglowTokens.inputShape,
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = colors.coral,
-                    unfocusedBorderColor = colors.border,
+                    unfocusedBorderColor = colors.borderStrong,
                     focusedContainerColor = colors.paperSecondary,
                     unfocusedContainerColor = colors.paperSecondary,
                     cursorColor = colors.coral,

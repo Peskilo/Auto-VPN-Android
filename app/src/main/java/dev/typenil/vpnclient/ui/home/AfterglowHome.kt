@@ -63,10 +63,20 @@ import dev.typenil.vpnclient.ui.common.routeModeSummary
 import dev.typenil.vpnclient.ui.common.uptimeText
 import dev.typenil.vpnclient.ui.theme.AfterglowTheme
 import dev.typenil.vpnclient.ui.theme.AfterglowTokens
+import dev.typenil.vpnclient.ui.theme.StateTone
+import dev.typenil.vpnclient.ui.theme.stateColors
 import kotlinx.coroutines.delay
 import java.time.Instant
 
-private enum class VisualState { Offline, Preparing, Permission, Connecting, Connected, Reconnecting, Stopping, Error }
+internal enum class VisualState { Offline, Preparing, Permission, Connecting, Connected, Reconnecting, Stopping, Error }
+
+/** Disconnected is neutral, in-flight states are warm, Connected is calm, only Error is red. */
+internal fun VisualState.tone() = when (this) {
+    VisualState.Offline, VisualState.Stopping -> StateTone.Neutral
+    VisualState.Preparing, VisualState.Permission, VisualState.Connecting, VisualState.Reconnecting -> StateTone.Progress
+    VisualState.Connected -> StateTone.Positive
+    VisualState.Error -> StateTone.Error
+}
 
 internal fun frameTimeNanos(lastTickNanos: Long, measuredNanos: Long): Long = maxOf(lastTickNanos, measuredNanos)
 
@@ -214,12 +224,8 @@ private fun ShortcutCard(label: Int, caption: String, server: Boolean, onClick: 
 @Composable
 private fun ConnectionHero(state: VisualState, noServers: Boolean, delayMs: Int? = null) {
     val colors = AfterglowTheme.colors
-    val target = when (state) {
-        VisualState.Connected -> colors.connectedHero
-        VisualState.Error -> colors.errorHero
-        VisualState.Preparing, VisualState.Connecting, VisualState.Permission, VisualState.Reconnecting -> colors.transitionalHero
-        else -> colors.offlineHero
-    }
+    val stateColors = colors.stateColors(state.tone())
+    val target = stateColors.hero
     // Token tween, not the default spring — hero color shifts are state
     // feedback, not physics; the standard duration matches the other state
     // colors (accent, action surface) so the whole surface lands together.
@@ -265,15 +271,15 @@ private fun ConnectionHero(state: VisualState, noServers: Boolean, delayMs: Int?
         Column(Modifier.align(Alignment.CenterStart).fillMaxWidth(if (largeFont) .82f else .72f)
             .padding(start = 18.dp, end = 8.dp, top = 20.dp, bottom = 20.dp)) {
             Text(stringResource(R.string.afterglow_your_connection),
-                color = colors.onActionSurface.copy(alpha = .72f), fontSize = 10.sp,
+                color = stateColors.onHeroMuted, fontSize = 10.sp,
                 fontWeight = FontWeight.Bold, letterSpacing = .8.sp,
                 modifier = Modifier.padding(bottom = 8.dp))
-            Text(headline, color = colors.onActionSurface, fontWeight = FontWeight.Bold,
+            Text(headline, color = stateColors.onHero, fontWeight = FontWeight.Bold,
                 fontSize = 28.sp, lineHeight = 33.sp)
-            HeroLatency(delayMs, Modifier.padding(top = 8.dp))
+            HeroLatency(delayMs, stateColors.onHero, Modifier.padding(top = 8.dp))
         }
         Box(Modifier.fillMaxWidth().height(3.dp).align(Alignment.BottomCenter)
-            .background(if (state == VisualState.Connected) colors.jade else colors.coralLight))
+            .background(stateColors.line))
     }
 }
 
@@ -296,14 +302,7 @@ private fun ConnectionAction(state: VisualState, noServers: Boolean, onConnect: 
         cancellable -> stringResource(R.string.common_cancel)
         else -> stringResource(R.string.home_status_connecting)
     }
-    val accent = when {
-        state == VisualState.Reconnecting -> colors.amber
-        active -> colors.jade
-        state == VisualState.Error -> colors.coralLight
-        state == VisualState.Connecting || state == VisualState.Preparing ||
-            state == VisualState.Permission -> colors.amber
-        else -> colors.coral
-    }
+    val accent = colors.stateColors(state.tone()).accent
     // Companion face per state: idle=sad, connecting/transition=thinking,
     // error=crossed-eyes, connected=happy. The peer mascot perches on the
     // button's top edge (negative offset keeps it overlapping, not inside).
@@ -322,13 +321,7 @@ private fun ConnectionAction(state: VisualState, noServers: Boolean, onConnect: 
         state == VisualState.Offline -> stringResource(R.string.afterglow_offline)
         else -> null
     }
-    val tint = when (state) {
-        VisualState.Connected -> colors.connectedHero
-        VisualState.Error -> colors.errorHero
-        VisualState.Preparing, VisualState.Permission, VisualState.Connecting,
-        VisualState.Reconnecting -> colors.transitionalHero
-        else -> colors.offlineHero
-    }
+    val tint = colors.stateColors(state.tone()).hero
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val pressScale by animateFloatAsState(if (pressed) .98f else 1f,
@@ -398,19 +391,19 @@ private fun ConnectionAction(state: VisualState, noServers: Boolean, onConnect: 
 }
 
 @Composable
-private fun HeroLatency(delayMs: Int?, modifier: Modifier = Modifier) {
+private fun HeroLatency(delayMs: Int?, onHero: Color, modifier: Modifier = Modifier) {
     if (delayMs == null || delayMs <= 0) return
     val colors = AfterglowTheme.colors
     // Match LatencyBadge semantics: <800 = healthy, >=800 = degraded. Use amber
     // for degraded so the dot stays visible on the red transitional/error heroes.
     val tone = if (delayMs < 800) colors.jade else colors.amber
     Row(modifier.clip(RoundedCornerShape(20.dp))
-        .background(colors.onActionSurface.copy(alpha = .14f))
+        .background(onHero.copy(alpha = .14f))
         .padding(horizontal = 10.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.size(6.dp).background(tone, CircleShape))
         Text(stringResource(R.string.afterglow_measured_latency, delayMs),
-            color = colors.onActionSurface, fontSize = 11.sp, fontWeight = FontWeight.Bold,
+            color = onHero, fontSize = 11.sp, fontWeight = FontWeight.Bold,
             modifier = Modifier.padding(start = 5.dp))
     }
 }

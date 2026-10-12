@@ -164,7 +164,7 @@ fun AfterglowTextField(
 private fun afterglowInputColors(c: AfterglowPalette) =
     OutlinedTextFieldDefaults.colors(
         focusedBorderColor = c.coral,
-        unfocusedBorderColor = c.border,
+        unfocusedBorderColor = c.borderStrong,
         errorBorderColor = c.error,
         cursorColor = c.coral,
         errorCursorColor = c.error,
@@ -197,7 +197,7 @@ fun AfterglowChip(
             FilterChipDefaults.filterChipBorder(
                 enabled = true,
                 selected = selected,
-                borderColor = c.border,
+                borderColor = c.borderStrong,
                 selectedBorderColor = c.ink,
             ),
         colors =
@@ -228,7 +228,7 @@ fun AfterglowSwitch(
                 checkedThumbColor = c.paper,
                 uncheckedTrackColor = c.paperSecondary,
                 uncheckedThumbColor = c.muted,
-                uncheckedBorderColor = c.border,
+                uncheckedBorderColor = c.borderStrong,
             ),
     )
 }
