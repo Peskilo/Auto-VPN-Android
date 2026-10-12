@@ -93,7 +93,7 @@ class SubscriptionFetcher @Inject constructor(
             val origin = try {
                 url.toHttpUrl()
             } catch (e: Exception) {
-                throw SubscriptionError.ParseFailed("bad url")
+                throw SubscriptionError.BadUrl
             }
             if (!isAllowedTransport(origin, origin, allowInsecure)) {
                 throw SubscriptionError.InsecureTransport
@@ -143,8 +143,9 @@ class SubscriptionFetcher @Inject constructor(
                 }
 
                 hwidRefusal(response.headers)?.let { reason ->
+                    val announce = providerMessage(response.headers)
                     response.close()
-                    throw SubscriptionError.DeviceIdentificationRejected(reason, hwid == null)
+                    throw SubscriptionError.DeviceIdentificationRejected(reason, hwid == null, announce)
                 }
                 if (response.isRedirect && redirectsLeft > 0) {
                     val location = response.header("Location")
@@ -203,7 +204,7 @@ class SubscriptionFetcher @Inject constructor(
         response.use { resp ->
                 val headers = resp.headers
                 if (!resp.isSuccessful) {
-                    throw mapHttpError(url, resp.code)
+                    throw mapHttpError(url, resp.code, providerMessage(headers))
                 }
                 val body = resp.body
                 val declared = body.contentLength()
@@ -251,10 +252,14 @@ class SubscriptionFetcher @Inject constructor(
                 )
             }
 
-    private fun mapHttpError(url: String, code: Int): SubscriptionError {
+    private fun mapHttpError(url: String, code: Int, announce: String?): SubscriptionError {
         SecureLog.w(TAG, "subscription fetch failed http=$code url=${Redactor.urlForDisplay(url)}")
-        return SubscriptionError.Http(code, url.hostOrNull())
+        return SubscriptionError.Http(code, url.hostOrNull(), announce)
     }
+
+    /** The error response's `announce`, sanitized for display. Never logged. */
+    private fun providerMessage(headers: okhttp3.Headers): String? =
+        sanitizeProviderMessage(decodeHeaderValue(headers["announce"]))
 
     /** `subscription-userinfo: upload=..; download=..; total=..; expire=..` */
     internal fun parseUserInfo(value: String?): SubscriptionUserInfo? {

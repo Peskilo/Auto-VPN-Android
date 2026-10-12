@@ -24,6 +24,9 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
@@ -109,8 +112,14 @@ class SubscriptionRepository
 
         private fun lockFor(id: Long): Mutex = subLocks.computeIfAbsent(id) { Mutex() }
 
+        /** Rows of adds still in flight: hidden from [profiles] so a subscription that may
+         *  yet fail never shows up half-made. */
+        private val pendingAdds = MutableStateFlow<Set<Long>>(emptySet())
+
         val profiles: Flow<List<SubscriptionProfile>> =
-            subscriptionDao.observeAll().map { list -> list.map { it.toDomain() } }
+            combine(subscriptionDao.observeAll(), pendingAdds) { list, pending ->
+                list.filter { it.id !in pending }.map { it.toDomain() }
+            }
 
         /** Nodes of the manual/local sentinel row in display order — drives
          *  the detail sheet's per-node delete list. Empty until the first
@@ -126,7 +135,7 @@ class SubscriptionRepository
             val trimmed = url.trim()
             val parsed =
                 runCatching { trimmed.toHttpUrl() }.getOrNull()
-                    ?: return Result.failure(SubscriptionError.ParseFailed("bad url"))
+                    ?: return Result.failure(SubscriptionError.BadUrl)
             // Reject a cleartext URL before a row exists — a subscription that can
             // never fetch should not be persisted at all.
             if (!parsed.isHttps && !allowInsecureHttp) {
@@ -150,26 +159,43 @@ class SubscriptionRepository
                     fallbackUrl = null,
                 )
             val id = subscriptionDao.insert(entity)
-            val result = refresh(id)
-            if (result.isFailure) {
-                // A failed first refresh still gets a periodic job when a fixed
-                // interval is in effect — otherwise the subscription could never
-                // recover on its own. New rows are InheritGlobal, so only a
-                // positive global override produces a job; provider mode stays
-                // unscheduled until a success supplies a hint.
-                try {
-                    if (settings.autoRefreshMinutes.first() > 0) {
-                        lockFor(id).withLock {
-                            rescheduleLocked(subscriptionDao.get(id) ?: return@withLock)
-                        }
-                    }
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Exception) {
-                    SecureLog.w(TAG, "post-add scheduling failed sub=$id: ${e.javaClass.simpleName}")
+            pendingAdds.update { it + id }
+            try {
+                val result = refresh(id)
+                // All-or-nothing: the row exists only to give the fetch an id. A failed first
+                // refresh leaves no row, nodes or scheduled work (nothing was scheduled yet —
+                // that happens only on a committed success).
+                if (result.isFailure) rollbackAdd(id)
+                return result
+            } catch (e: Throwable) {
+                withContext(NonCancellable) { rollbackAdd(id) }
+                throw e
+            } finally {
+                pendingAdds.update { it - id }
+            }
+        }
+
+        private suspend fun rollbackAdd(id: Long) {
+            try {
+                lockFor(id).withLock { deleteRows(id) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                SecureLog.w(TAG, "add rollback failed sub=$id: ${e.javaClass.simpleName}")
+            }
+        }
+
+        /** Prefs, nodes and the row go together or not at all. */
+        private suspend fun deleteRows(id: Long) {
+            prefsMutex.withLock {
+                transactions.run {
+                    // Prefs go first while the node rows still exist — the DAO prunes by
+                    // sub-select on nodes, so ordering matters.
+                    nodePreferenceDao.deleteForSubscription(id)
+                    nodeDao.deleteForSubscription(id)
+                    subscriptionDao.delete(id)
                 }
             }
-            return result
         }
 
         /** Which entry point asked for the refresh — the pre-fetch gate and
@@ -437,7 +463,14 @@ class SubscriptionRepository
                         throw e
                     }
                 }
-            val candidate = parseAndValidate(id, body.body, body.contentType)
+            val candidate =
+                try {
+                    parseAndValidate(id, body.body, body.contentType)
+                } catch (e: SubscriptionError.EmptyResult) {
+                    // No nodes: say why only when the provider's own userinfo does.
+                    throw inactiveReason(body.userInfo, Instant.now().epochSecond)
+                        ?.let(SubscriptionError::Inactive) ?: e
+                }
             return PreparedRefresh(
                 // The row URL the body was fetched from — commitRefresh re-reads
                 // the row and re-fetches when an editUrl changed it mid-flight.
@@ -1007,7 +1040,7 @@ class SubscriptionRepository
                         val sub = subscriptionDao.get(id) ?: throw SubscriptionError.NotFound
                         val candidate =
                             runCatching { trimmed.toHttpUrl() }.getOrNull()
-                                ?: throw SubscriptionError.ParseFailed("bad url")
+                                ?: throw SubscriptionError.BadUrl
                         // The transport gate is the stored per-subscription opt-in,
                         // same as refresh() — an https row pointed at cleartext is
                         // rejected unless the user opted in.
@@ -1128,19 +1161,10 @@ class SubscriptionRepository
                     SecureLog.w(TAG, "refused to remove manual sentinel sub=$id")
                     return@withLock
                 }
-                prefsMutex.withLock {
-                    // Both deletes commit atomically — a crash between them would
-                    // orphan a subscription with no nodes and no scheduled recovery.
-                    // The work is cancelled only after commit so a failed delete
-                    // leaves the retry job in place.
-                    transactions.run {
-                        // Prefs go first while the node rows still exist — the
-                        // DAO prunes by sub-select on nodes, so ordering matters.
-                        nodePreferenceDao.deleteForSubscription(id)
-                        nodeDao.deleteForSubscription(id)
-                        subscriptionDao.delete(id)
-                    }
-                }
+                // Rows commit atomically — a crash between deletes would orphan a
+                // subscription with no nodes and no scheduled recovery. The work is
+                // cancelled only after commit so a failed delete leaves the retry job.
+                deleteRows(id)
                 scheduler.cancel(id)
             }
         }
@@ -1252,6 +1276,8 @@ class SubscriptionRepository
                 is SubscriptionError.UnsupportedFormat -> "unsupported format"
                 is SubscriptionError.ParseFailed -> "parse failed"
                 is SubscriptionError.EmptyResult -> "no usable nodes"
+                is SubscriptionError.Inactive -> "no usable nodes"
+                is SubscriptionError.BadUrl -> "bad url"
                 is SubscriptionError.ConfigRejected -> "rejected by engine"
                 is SubscriptionError.InsecureTransport -> "https required"
                 is SubscriptionError.ForbiddenAddress -> "redirect to local address blocked"

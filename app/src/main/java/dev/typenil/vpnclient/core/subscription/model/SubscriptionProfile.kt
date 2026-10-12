@@ -56,7 +56,10 @@ enum class SubscriptionFormat {
 
 /** Typed subscription failures — never bare strings. */
 sealed class SubscriptionError : Exception() {
-    data class Http(val code: Int, override val message: String) : SubscriptionError()
+    /** [announce] is sanitized provider text from the error response — never log it. */
+    data class Http(val code: Int, override val message: String, val announce: String? = null) : SubscriptionError() {
+        override fun toString() = "Http(code=$code)"
+    }
     data object Network : SubscriptionError() {
         override val message = "network unavailable"
     }
@@ -89,7 +92,20 @@ sealed class SubscriptionError : Exception() {
     data class DeviceIdentificationRejected(
         val reason: HwidRefusal,
         val sendingDisabled: Boolean,
-    ) : SubscriptionError()
+        /** Sanitized provider text from the refusal response — never log it. */
+        val announce: String? = null,
+    ) : SubscriptionError() {
+        override fun toString() = "DeviceIdentificationRejected(reason=$reason, sendingDisabled=$sendingDisabled)"
+    }
+    /** The URL itself is not a usable http(s) address. */
+    data object BadUrl : SubscriptionError() {
+        override val message = "bad url"
+    }
+    enum class InactiveReason { Expired, TrafficUsedUp }
+    /** The response carried no nodes and its `subscription-userinfo` says why. */
+    data class Inactive(val reason: InactiveReason) : SubscriptionError() {
+        override val message = "no usable nodes in subscription"
+    }
     /** Legacy typed error retained for old callers. */
     data class DeviceLimitReached(val detail: String?) : SubscriptionError()
     /** The subscription row no longer exists (removed mid-flight). */

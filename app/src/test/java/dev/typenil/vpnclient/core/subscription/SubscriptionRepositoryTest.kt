@@ -18,6 +18,7 @@ import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
@@ -50,7 +51,7 @@ class SubscriptionRepositoryTest {
         var attemptCalls = 0
         var lastAttemptError: String? = null
 
-        override fun observeAll() = flowOf(subs.values.toList())
+        override fun observeAll() = flow { emit(subs.values.toList()) }
         override suspend fun get(id: Long) = subs[id]
         override suspend fun findIdByUrl(url: String): Long? =
             subs.values.firstOrNull { it.url == url }?.id
@@ -652,33 +653,138 @@ class SubscriptionRepositoryTest {
         assertEquals(listOf(1L), scheduler.cancelled)
     }
 
-    @Test
-    fun `failed add still schedules when user override is set`() = runTest {
-        settings.autoRefresh.value = 60
-        server.enqueue(MockResponse().setResponseCode(500))
+    // ---- failed add: nothing is left behind, the cause is typed ----
 
-        val result = repository.add(
-            server.url("/sub").toString(), null, allowInsecureHttp = true,
-        )
+    private val addUrl get() = server.url("/sub").toString()
 
+    /** Runs a first add against [response]; asserts no row, nodes or work remain. */
+    private suspend fun failedAdd(response: MockResponse): SubscriptionError {
+        settings.autoRefresh.value = 60 // a leftover row would have been scheduled
+        server.enqueue(response)
+        val result = repository.add(addUrl, null, allowInsecureHttp = true)
         assertTrue(result.isFailure)
-        val call = scheduler.scheduled.single()
-        assertEquals(subscriptionDao.subs.keys.single(), call.id)
-        assertNull(call.providerMinutes)
-        assertEquals(60, call.userOverride)
-        assertTrue(call.enabled)
+        assertTrue("row left behind", subscriptionDao.subs.isEmpty())
+        assertTrue("nodes left behind", nodeDao.nodes.isEmpty())
+        assertTrue("work scheduled", scheduler.scheduled.isEmpty())
+        assertTrue("scheduler touched", scheduler.cancelled.isEmpty())
+        assertTrue(repository.profiles.first().isEmpty())
+        return result.exceptionOrNull() as SubscriptionError
     }
 
     @Test
-    fun `failed add in provider mode stays unscheduled`() = runTest {
-        server.enqueue(MockResponse().setResponseCode(500))
+    fun `failed add leaves nothing for every http status`() = runTest {
+        listOf(403, 404, 429, 500, 503).forEach { code ->
+            val e = failedAdd(MockResponse().setResponseCode(code))
+            assertEquals(code, (e as SubscriptionError.Http).code)
+        }
+    }
 
-        val result = repository.add(
-            server.url("/sub").toString(), null, allowInsecureHttp = true,
-        )
+    @Test
+    fun `failed add leaves nothing for each hwid refusal and keeps them distinct from http`() = runTest {
+        var e = failedAdd(MockResponse().setResponseCode(403).setHeader("x-hwid-max-devices-reached", "true"))
+        assertEquals(SubscriptionError.HwidRefusal.MaxDevices, (e as SubscriptionError.DeviceIdentificationRejected).reason)
+        assertFalse(e.sendingDisabled)
+        e = failedAdd(MockResponse().setResponseCode(404).setHeader("x-hwid-not-supported", "true"))
+        assertEquals(SubscriptionError.HwidRefusal.MissingOrInvalid, (e as SubscriptionError.DeviceIdentificationRejected).reason)
+        e = failedAdd(MockResponse().setResponseCode(403).setHeader("x-hwid-limit", "true"))
+        assertEquals(SubscriptionError.HwidRefusal.Ambiguous, (e as SubscriptionError.DeviceIdentificationRejected).reason)
+        settings.hwidConsent.value = HwidConsent.Denied
+        e = failedAdd(MockResponse().setResponseCode(403).setHeader("x-hwid-not-supported", "true"))
+        assertTrue((e as SubscriptionError.DeviceIdentificationRejected).sendingDisabled)
+    }
 
-        assertTrue(result.isFailure)
-        assertTrue(scheduler.scheduled.isEmpty())
+    @Test
+    fun `failed add leaves nothing on network loss and bad bodies`() = runTest {
+        assertTrue(failedAdd(MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_AT_START)) is SubscriptionError.Network)
+        assertTrue(failedAdd(MockResponse().setBody("not a subscription at all")) !is SubscriptionError.Http)
+        assertTrue(failedAdd(MockResponse().setBody("""{"outbounds":[]}""")) is SubscriptionError.EmptyResult)
+    }
+
+    @Test
+    fun `an empty response is inactive only when userinfo says so`() = runTest {
+        val body = """{"outbounds":[]}"""
+        val expired = failedAdd(MockResponse().setBody(body)
+            .setHeader("subscription-userinfo", "upload=0; download=0; total=100; expire=1"))
+        assertEquals(SubscriptionError.InactiveReason.Expired, (expired as SubscriptionError.Inactive).reason)
+        val used = failedAdd(MockResponse().setBody(body)
+            .setHeader("subscription-userinfo", "upload=60; download=50; total=100"))
+        assertEquals(SubscriptionError.InactiveReason.TrafficUsedUp, (used as SubscriptionError.Inactive).reason)
+        val live = failedAdd(MockResponse().setBody(body)
+            .setHeader("subscription-userinfo", "upload=0; download=0; total=100; expire=99999999999"))
+        assertTrue(live is SubscriptionError.EmptyResult)
+    }
+
+    @Test
+    fun `failed add rejects an unusable address before any row exists`() = runTest {
+        val result = repository.add("not a url", null)
+        assertTrue(result.exceptionOrNull() is SubscriptionError.BadUrl)
+        assertTrue(subscriptionDao.subs.isEmpty())
+        assertEquals(0, server.requestCount)
+    }
+
+    @Test
+    fun `provider message on an error response is bounded and plain`() = runTest {
+        val noisy = "<b>Limit</b> reached\u202e\n\u0007 \tcall  <a href=\"https://example.com\">us</a> " + "x".repeat(600)
+        val b64 = "base64:" + java.util.Base64.getEncoder().encodeToString(noisy.toByteArray())
+        val http = failedAdd(MockResponse().setResponseCode(403).setHeader("announce", b64)) as SubscriptionError.Http
+        val text = http.announce!!
+        assertEquals(PROVIDER_MESSAGE_MAX_CHARS, text.length)
+        assertTrue(text.startsWith("Limit reached call us x"))
+        assertTrue(text.endsWith("…"))
+        assertTrue(text.none { it.isISOControl() || it == '\u202e' || it == '<' })
+        val hwid = failedAdd(MockResponse().setResponseCode(403)
+            .setHeader("x-hwid-max-devices-reached", "true").setHeader("announce", "Remove an old device"))
+        assertEquals("Remove an old device", (hwid as SubscriptionError.DeviceIdentificationRejected).announce)
+        assertNull((failedAdd(MockResponse().setResponseCode(404)) as SubscriptionError.Http).announce)
+        // toString feeds logs and crash reports: it must not carry the provider text.
+        assertFalse(http.toString().contains("Limit"))
+    }
+
+    @Test
+    fun `a failed refresh of an existing subscription keeps its nodes and row`() = runTest {
+        seedSubscription()
+        val old = nodeEntity(uri("old.example.com", "Old"), 1)
+        nodeDao.nodes[old.id] = old
+        server.enqueue(MockResponse().setResponseCode(403)
+            .setHeader("x-hwid-max-devices-reached", "true").setHeader("announce", "Provider says no"))
+
+        assertTrue(repository.refresh(1).isFailure)
+
+        assertEquals(1, subscriptionDao.subs.size)
+        assertEquals(listOf(old.id), nodeDao.forSubscription(1).map { it.id })
+        assertEquals("sub:hwid:max", subscriptionDao.lastAttemptError)
+    }
+
+    @Test
+    fun `a cancelled add leaves nothing and an in-flight add stays hidden`() = runTest {
+        server.enqueue(MockResponse().setBody(uri("a.example.com", "A")))
+        val gate = CompletableDeferred<Unit>()
+        validator.gate = gate
+        val job = launch { repository.add(addUrl, null, allowInsecureHttp = true) }
+        val deadline = System.currentTimeMillis() + 5_000
+        while (validator.calls == 0 && System.currentTimeMillis() < deadline) {
+            advanceUntilIdle()
+            Thread.sleep(20)
+        }
+        assertEquals(1, subscriptionDao.subs.size)
+        assertTrue("pending row visible", repository.profiles.first().isEmpty())
+
+        job.cancelAndJoin()
+
+        assertTrue(subscriptionDao.subs.isEmpty())
+        assertTrue(nodeDao.nodes.isEmpty())
+    }
+
+    @Test
+    fun `a successful add keeps the row nodes schedule and becomes visible`() = runTest {
+        server.enqueue(MockResponse().setBody(uri("a.example.com", "A")).setHeader("profile-update-interval", "2"))
+
+        assertTrue(repository.add(addUrl, null, allowInsecureHttp = true).isSuccess)
+
+        assertEquals("rows", 1, subscriptionDao.subs.size)
+        assertEquals("nodes", 1, nodeDao.nodes.size)
+        assertEquals(120, scheduler.scheduled.single().providerMinutes)
+        assertEquals("visible", 1, repository.profiles.first().size)
     }
 
     @Test
