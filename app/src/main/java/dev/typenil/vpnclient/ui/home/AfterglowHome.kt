@@ -109,6 +109,8 @@ internal fun AfterglowHomeContent(
     onOpenSettings: () -> Unit = {},
     onDismissGuard: () -> Unit,
     errorMessage: String?,
+    /** Non-null when [errorMessage] is a dismissible pick rejection, not a failure. */
+    onDismissNotice: (() -> Unit)? = null,
     batteryHint: @Composable () -> Unit = {},
 ) {
     val colors = AfterglowTheme.colors
@@ -142,12 +144,23 @@ internal fun AfterglowHomeContent(
                 }
             }
             ConnectionHero(state.visual(), noServers, ui.selectedDelayMs)
-            if (errorMessage != null) StatusNotice(errorMessage, onOpenDiagnostics, true)
+            if (errorMessage != null) {
+                if (onDismissNotice != null) {
+                    StatusNotice(errorMessage, onDismissNotice, false, null, stringResource(R.string.common_dismiss))
+                } else {
+                    StatusNotice(errorMessage, onOpenDiagnostics, true, null, stringResource(R.string.afterglow_open_diagnostics))
+                }
+            }
             if (state == VpnConnectionState.PermissionRequired) {
                 Text(stringResource(R.string.afterglow_permission_explanation), color = colors.muted,
                     modifier = Modifier.padding(top = 12.dp), fontSize = 14.sp)
             }
-            if (ui.restartGuardTripped) StatusNotice(stringResource(R.string.home_restart_guard_text), onDismissGuard, false)
+            if (ui.restartGuardTripped) {
+                StatusNotice(
+                    stringResource(R.string.home_restart_guard_text), onDismissGuard, false,
+                    stringResource(R.string.afterglow_restart_guard_title), stringResource(R.string.common_dismiss),
+                )
+            }
             batteryHint()
             Spacer(Modifier.height(18.dp))
             // Selected server + routing and live stats carry the session —
@@ -793,17 +806,16 @@ private fun TrafficChart(samples: List<TrafficHistory.Point>, nowNanos: Long, do
 }
 
 @Composable
-private fun StatusNotice(message: String, onClick: () -> Unit, error: Boolean) {
+private fun StatusNotice(message: String, onClick: () -> Unit, error: Boolean, title: String?, actionLabel: String) {
     val colors = AfterglowTheme.colors
     Column(Modifier.fillMaxWidth().background(if (error) colors.errorSurface else colors.paperSecondary)
         .semantics { role = Role.Button }
         .clickable(onClick = onClick).padding(16.dp)) {
-        // An error notice never repeats the hero headline ("Connection failed"):
-        // the hero names the state, the notice carries only the reason and action.
-        if (!error) Text(stringResource(R.string.afterglow_restart_guard_title),
-            color = colors.ink, fontWeight = FontWeight.Bold)
-        Text(message, color = colors.ink, fontSize = 14.sp, modifier = Modifier.padding(top = if (error) 0.dp else 4.dp))
-        Text(stringResource(if (error) R.string.afterglow_open_diagnostics else R.string.common_dismiss),
+        // A notice never repeats the hero headline ("Connection failed"): the hero
+        // names the state, the notice carries the reason and its action.
+        if (title != null) Text(title, color = colors.ink, fontWeight = FontWeight.Bold)
+        Text(message, color = colors.ink, fontSize = 14.sp, modifier = Modifier.padding(top = if (title == null) 0.dp else 4.dp))
+        Text(actionLabel,
             color = colors.coral, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp))
     }
 }

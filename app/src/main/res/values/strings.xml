@@ -223,7 +223,7 @@
     <string name="home_error_permission_denied">VPN permission denied</string>
     <string name="home_error_permission_revoked">VPN was turned off by the system or another VPN app. Tap Connect to turn it on again.</string>
     <string name="servers_connection_blocked">Connection blocked</string>
-    <string name="home_selection_unencrypted">Selection not applied: this remote server is unencrypted. The current tunnel is unchanged.</string>
+    <string name="home_selection_unencrypted">Couldn\'t switch to this server: it isn\'t encrypted. The connection is still running on the previous server.</string>
     <string name="servers_unencrypted">Unencrypted</string>
     <string name="servers_local_sidecar">Exception for a server on this device</string>
     <string name="home_error_unencrypted">Unencrypted connections to remote servers are blocked. Choose an encrypted server or one running on this device.</string>

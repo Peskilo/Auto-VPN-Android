@@ -124,6 +124,18 @@ class SettingsRepository
             }
         }
 
+        /** Replace the selection with [replacement] only if it still equals [expected] (single atomic edit). */
+        suspend fun replaceSelectedNodeIdIf(expected: String, replacement: String): Boolean {
+            var applied = false
+            context.settingsStore.edit { prefs ->
+                if (prefs[Keys.SELECTED_NODE_ID] == expected) {
+                    prefs[Keys.SELECTED_NODE_ID] = replacement
+                    applied = true
+                }
+            }
+            return applied
+        }
+
         /** Stable per-install device id for Remnawave HWID (never a hardware id). */
         val hwid: Flow<String?> =
             context.settingsStore.data

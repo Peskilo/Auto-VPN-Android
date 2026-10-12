@@ -178,6 +178,13 @@ class ConnectionManagerTest {
             return id !in blockedIds
         }
 
+        /** Mirrors the DataStore compare-and-set. */
+        override suspend fun revertSelectionIf(rejected: String, to: String): Boolean {
+            if (selected.value != rejected) return false
+            selected.value = to
+            return true
+        }
+
         /** Fingerprint of the enabled set the live session compares against. */
         val enabledFingerprint = MutableStateFlow("fingerprint-a")
 
@@ -1923,7 +1930,40 @@ class ConnectionManagerTest {
         assertEquals(0, serviceControl.disconnectStarts)
         assertEquals("node-1", (manager.state.value as VpnConnectionState.Connected).node.id)
         assertEquals(VpnError.UnencryptedTransport, manager.selectionError.value)
-        configProvider.selected.value = "node-1"
+        // The rejected pick is rolled back to the running node and the notice survives
+        // the reconcile that rollback triggers.
+        assertEquals("node-1", configProvider.selected.value)
+        assertEquals(VpnError.UnencryptedTransport, manager.selectionError.value)
+        manager.clearSelectionError()
+        assertNull(manager.selectionError.value)
+    }
+
+    @Test
+    fun `rejected pick does not overwrite a newer user pick`() = testScope.runTest {
+        connectToRunning()
+        engine.groupsFlow.value = listOf(proxyGroup(selected = "node-1"))
+        configProvider.blockedIds = setOf("node-2")
+        val gate = CompletableDeferred<Unit>()
+        configProvider.selectionGate = gate
+        configProvider.selected.value = "node-2"
+        runCurrent()
+        // The user moves on while the policy query is in flight.
+        configProvider.selected.value = "node-3"
+        gate.complete(Unit)
+        advanceUntilIdle()
+        assertEquals("node-3", configProvider.selected.value)
+    }
+
+    @Test
+    fun `a later allowed pick clears the rejection notice`() = testScope.runTest {
+        connectToRunning()
+        engine.groupsFlow.value = listOf(proxyGroup(selected = "node-1"))
+        configProvider.blockedIds = setOf("node-2")
+        configProvider.selected.value = "node-2"
+        advanceUntilIdle()
+        assertEquals(VpnError.UnencryptedTransport, manager.selectionError.value)
+        configProvider.blockedIds = emptySet()
+        configProvider.selected.value = "node-2"
         advanceUntilIdle()
         assertNull(manager.selectionError.value)
     }

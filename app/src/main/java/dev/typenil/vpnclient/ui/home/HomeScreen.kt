@@ -129,6 +129,7 @@ fun HomeScreen(
             is HomeNotice.SelectionRejected -> stringResource(R.string.home_selection_unencrypted)
             null -> null
         },
+        onDismissNotice = if (ui.notice() is HomeNotice.SelectionRejected) viewModel::dismissSelectionNotice else null,
     )
     if (showPicker) {
         ServerPickerSheet(

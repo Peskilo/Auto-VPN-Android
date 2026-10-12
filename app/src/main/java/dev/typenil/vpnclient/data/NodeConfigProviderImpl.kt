@@ -116,6 +116,9 @@ class NodeConfigProviderImpl
                 nodeDao.get(id)?.let { isTunnelAllowed(it.toDomain()) } ?: true
             }
 
+        override suspend fun revertSelectionIf(rejected: String, to: String): Boolean =
+            settings.replaceSelectedNodeIdIf(rejected, to)
+
         override suspend fun compileSelected(): EngineConfig? {
             val entities = nodeDao.getUsable()
             val nodes = entities.map { it.toDomain() }

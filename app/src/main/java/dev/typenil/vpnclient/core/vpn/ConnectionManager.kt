@@ -103,6 +103,13 @@ interface NodeConfigProvider {
     suspend fun isSelectionAllowed(id: String): Boolean
 
     /**
+     * Roll the persisted pick from [rejected] back to [to], only if it still equals
+     * [rejected] (atomic: a newer user pick is never overwritten). Returns whether
+     * it was applied.
+     */
+    suspend fun revertSelectionIf(rejected: String, to: String): Boolean = false
+
+    /**
      * Fingerprint of the enabled node set's tunnel-relevant content. Changes
      * whenever the compiled outbound list would change — the signal a live
      * session must rebuild on. Insensitive to row order and to display-only
@@ -159,6 +166,16 @@ class ConnectionManager
         private val _selectionError = MutableStateFlow<VpnError?>(null)
         /** A rejected pick is not a terminal failure of the existing live tunnel. */
         val selectionError: StateFlow<VpnError?> = _selectionError
+
+        /** Set (under [selectionMutex]) after a rejected pick was rolled back: the
+         *  reconcile that rollback triggers must not clear the notice. */
+        private var keepSelectionNotice = false
+
+        /** The user dismissed the rejected-selection notice. */
+        fun clearSelectionError() {
+            keepSelectionNotice = false
+            _selectionError.value = null
+        }
 
         private var postStartJob: Job? = null
         private var postStartTokens: List<HealthEvidenceToken> = emptyList()
@@ -860,9 +877,19 @@ class ConnectionManager
                         _state.value !is VpnConnectionState.Reconnecting)) return@withLock
                 if (!allowed) {
                     _selectionError.value = VpnError.UnencryptedTransport
+                    // Roll the persisted pick back to the node the tunnel is on, so a
+                    // later reconnect doesn't fail on a pick the user was told was
+                    // not applied. Compare-and-set: a newer user pick is never undone.
+                    val running = sessionNode?.id
+                    if (running != null && running != desired &&
+                        configProvider.revertSelectionIf(rejected = desired, to = running)
+                    ) {
+                        // The reconcile this revert triggers must not clear the notice.
+                        keepSelectionNotice = true
+                    }
                     return@withLock
                 }
-                _selectionError.value = null
+                if (keepSelectionNotice) keepSelectionNotice = false else _selectionError.value = null
                 if (desired != sessionNode?.id) {
                     healthStore.invalidate(sessionGeneration, ConnectionHealthStore.PATH_LEVELS, HealthReason.PathChanged)
                 }
@@ -1523,6 +1550,7 @@ class ConnectionManager
             val reason = (next as? VpnConnectionState.Reconnecting)?.reason?.name?.let { "($it)" } ?: ""
             SecureLog.d(TAG, "state ${state.value.javaClass.simpleName} -> ${next.javaClass.simpleName}$reason")
             if (next !is VpnConnectionState.Connected && next !is VpnConnectionState.Reconnecting) {
+                keepSelectionNotice = false
                 _selectionError.value = null
             }
             _state.value = next

@@ -419,6 +419,9 @@ class HomeViewModel
             viewModelScope.launch { settings.setSelectedNodeId(id) }
         }
 
+        /** Dismiss the "pick not applied" notice. */
+        fun dismissSelectionNotice() = connectionManager.clearSelectionError()
+
         fun connect() = connectionManager.connect()
 
         fun disconnect() = connectionManager.disconnect()
