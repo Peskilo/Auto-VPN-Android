@@ -211,7 +211,7 @@ internal fun AfterglowHomeContent(
 private val HomeContentMaxWidth = 560.dp
 
 @Composable
-private fun SectionHeader(text: String, modifier: Modifier = Modifier) {
+internal fun SectionHeader(text: String, modifier: Modifier = Modifier) {
     Text(text.uppercase(), color = AfterglowTheme.colors.coral, fontWeight = FontWeight.Bold,
         fontSize = 11.sp, letterSpacing = 1.sp, modifier = modifier)
 }

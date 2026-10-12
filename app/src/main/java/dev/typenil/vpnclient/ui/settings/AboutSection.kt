@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -20,15 +19,14 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import dev.typenil.vpnclient.BuildConfig
 import dev.typenil.vpnclient.R
+import dev.typenil.vpnclient.ui.home.SectionHeader
 import dev.typenil.vpnclient.ui.theme.AfterglowTokens
 
 @Composable
 internal fun AboutSection() {
-    HorizontalDivider(Modifier.padding(vertical = 8.dp))
-    Text(
+    SectionHeader(
         stringResource(R.string.about_title),
-        style = MaterialTheme.typography.titleMedium,
-        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+        Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 4.dp),
     )
     InfoRow(
         stringResource(R.string.about_version),

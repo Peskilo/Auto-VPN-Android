@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.annotation.StringRes
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
@@ -25,7 +26,6 @@ import androidx.compose.foundation.verticalScroll
 import dev.typenil.vpnclient.ui.theme.AfterglowDialog as AlertDialog
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import dev.typenil.vpnclient.ui.theme.AfterglowTextField as OutlinedTextField
@@ -62,6 +62,8 @@ import dev.typenil.vpnclient.R
 import dev.typenil.vpnclient.core.common.AppLanguage
 import dev.typenil.vpnclient.core.common.ThemeMode
 import dev.typenil.vpnclient.core.subscription.HwidConsent
+import dev.typenil.vpnclient.ui.common.openBatterySettings
+import dev.typenil.vpnclient.ui.home.SectionHeader
 import dev.typenil.vpnclient.ui.theme.AfterglowTokens
 
 @Composable
@@ -116,23 +118,7 @@ fun SettingsScreen(
                 .verticalScroll(rememberScrollState())
                 .navigationBarsPadding(),
     ) {
-        SwitchRow(
-            title = stringResource(R.string.hwid_send),
-            subtitle = stringResource(
-                if (ui.hwidConsent == HwidConsent.Allowed) R.string.hwid_what
-                else R.string.hwid_sending_off,
-            ),
-            checked = ui.hwidConsent == HwidConsent.Allowed,
-            onCheckedChange = { allowed ->
-                if (allowed && ui.hwidConsent == HwidConsent.Unset) {
-                    pendingHwidAllow = true
-                    showHwidExplanation = true
-                } else viewModel.setHwidAllowed(allowed)
-            },
-        )
-        TextButton(onClick = { showHwidExplanation = true }, modifier = Modifier.padding(horizontal = 8.dp)) {
-            Text(stringResource(R.string.hwid_what))
-        }
+        SettingsSection(R.string.settings_section_connection)
         SwitchRow(
             title = stringResource(R.string.settings_reconnect_on_change),
             subtitle = stringResource(R.string.settings_reconnect_on_change_sub),
@@ -179,24 +165,26 @@ fun SettingsScreen(
             }
             NavChevron()
         }
-        ThemeModeRow(
-            mode = ui.themeMode,
-            onSelect = viewModel::setThemeMode,
-        )
-        LanguageRow(
-            language = ui.appLanguage,
-            onSelect = viewModel::setAppLanguage,
-        )
-        if (ui.dynamicColorAvailable) {
-            SwitchRow(
-                title = stringResource(R.string.settings_dynamic_color),
-                subtitle = stringResource(R.string.settings_dynamic_color_sub),
-                checked = ui.dynamicColor,
-                onCheckedChange = viewModel::setDynamicColor,
-            )
-        }
         AlwaysOnRow()
-        dev.typenil.vpnclient.ui.common.BatteryHintCard()
+        BatteryRow()
+        SettingsSection(R.string.settings_section_subscriptions)
+        SwitchRow(
+            title = stringResource(R.string.hwid_send),
+            subtitle = stringResource(
+                if (ui.hwidConsent == HwidConsent.Allowed) R.string.hwid_what
+                else R.string.hwid_sending_off,
+            ),
+            checked = ui.hwidConsent == HwidConsent.Allowed,
+            onCheckedChange = { allowed ->
+                if (allowed && ui.hwidConsent == HwidConsent.Unset) {
+                    pendingHwidAllow = true
+                    showHwidExplanation = true
+                } else viewModel.setHwidAllowed(allowed)
+            },
+        )
+        TextButton(onClick = { showHwidExplanation = true }, modifier = Modifier.padding(horizontal = 8.dp)) {
+            Text(stringResource(R.string.hwid_what))
+        }
         SwitchRow(
             title = stringResource(R.string.settings_auto_refresh),
             subtitle =
@@ -231,12 +219,26 @@ fun SettingsScreen(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
         )
 
-        HorizontalDivider(Modifier.padding(vertical = 8.dp))
-
+        SettingsSection(R.string.settings_section_app)
+        ThemeModeRow(
+            mode = ui.themeMode,
+            onSelect = viewModel::setThemeMode,
+        )
+        LanguageRow(
+            language = ui.appLanguage,
+            onSelect = viewModel::setAppLanguage,
+        )
+        if (ui.dynamicColorAvailable) {
+            SwitchRow(
+                title = stringResource(R.string.settings_dynamic_color),
+                subtitle = stringResource(R.string.settings_dynamic_color_sub),
+                checked = ui.dynamicColor,
+                onCheckedChange = viewModel::setDynamicColor,
+            )
+        }
         NotificationPermissionRow()
 
-        HorizontalDivider(Modifier.padding(vertical = 8.dp))
-
+        SettingsSection(R.string.diag_title)
         Row(
             modifier =
                 Modifier
@@ -261,6 +263,48 @@ fun SettingsScreen(
         }
 
         AboutSection()
+    }
+}
+
+/** Afterglow section header (same style as Home), with uniform spacing. */
+@Composable
+private fun SettingsSection(@StringRes title: Int) {
+    SectionHeader(
+        stringResource(title),
+        Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 4.dp),
+    )
+}
+
+/** Same row shape as its neighbours; opens system battery settings on click only. */
+@Composable
+private fun BatteryRow() {
+    val context = LocalContext.current
+    var unavailable by remember { mutableStateOf(false) }
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clickable { unavailable = !openBatterySettings(context) }
+                .heightIn(min = AfterglowTokens.touchTarget)
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(stringResource(R.string.battery_hint_title), style = MaterialTheme.typography.bodyLarge)
+            Text(
+                stringResource(R.string.battery_hint_body),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            if (unavailable) {
+                Text(
+                    stringResource(R.string.battery_hint_unavailable),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        NavChevron()
     }
 }
 
