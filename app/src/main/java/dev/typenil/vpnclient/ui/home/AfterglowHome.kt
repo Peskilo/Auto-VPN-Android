@@ -140,7 +140,7 @@ internal fun AfterglowHomeContent(
             .windowInsetsPadding(WindowInsets.navigationBars.only(WindowInsetsSides.Horizontal))
             .padding(bottom = actionReserve)) {
             Row(Modifier.fillMaxWidth().heightIn(min = if (isShortWindow(LocalConfiguration.current.screenHeightDp)) 48.dp else 58.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("RUNE", fontSize = 31.sp, fontWeight = FontWeight.Black, letterSpacing = (-2).sp, color = colors.ink)
+                Text(stringResource(R.string.brand_wordmark), fontSize = 31.sp, fontWeight = FontWeight.Black, letterSpacing = (-2).sp, color = colors.ink)
                 Text(".", fontSize = 31.sp, fontWeight = FontWeight.Black, color = colors.coral)
                 Spacer(Modifier.weight(1f))
                 IconButton(onClick = onOpenSettings) {

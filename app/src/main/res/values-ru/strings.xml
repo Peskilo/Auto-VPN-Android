@@ -1,5 +1,4 @@
 <resources>
-    <string name="app_name">VPN Client</string>
     <string name="format_unit_b">Б</string>
     <string name="format_unit_kb">КБ</string>
     <string name="format_unit_mb">МБ</string>

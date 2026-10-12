@@ -4,9 +4,9 @@ import dev.typenil.vpnclient.core.vpn.ConnectionHealth
 import java.util.UUID
 
 internal object DiagnosticExport {
-    fun render(app: List<String>, core: List<String>, title: String, empty: String,
+    fun render(appName: String, app: List<String>, core: List<String>, title: String, empty: String,
                previousSession: String? = null, health: ConnectionHealth? = null): String = buildString {
-        appendLine("VPN Client diagnostics — sensitive data is redacted.")
+        appendLine("$appName diagnostics — sensitive data is redacted.")
         appendLine("Recent app and core logs only; no raw proxy configurations.")
         appendLine("generated: " + java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US).format(java.util.Date()))
         appendLine()
