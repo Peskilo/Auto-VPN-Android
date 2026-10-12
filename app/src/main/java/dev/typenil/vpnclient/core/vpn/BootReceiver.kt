@@ -50,23 +50,8 @@ class BootReceiver : BroadcastReceiver() {
                     settings.desiredVpnRunning.first()
                 } == true
                 val consented = VpnService.prepare(context) == null
-                if (wanted && consented) {
-                    // FGS-start can still throw on edge states (API 31+) —
-                    // a crash inside onReceive is worse than a missed restore.
-                    runCatching {
-                        ContextCompat.startForegroundService(
-                            context, ClientVpnService.restoreIntent(context),
-                        )
-                    }.onFailure {
-                        SecureLog.w(TAG, "boot restore start failed")
-                        AutoStartNotifier(AndroidNoticeSink(context)).failed(
-                            AutomaticStartBranch.Restore, VpnError.Unexpected("boot restore start failed"),
-                        )
-                    }
-                } else if (wanted) {
-                    // Protection was expected but consent is gone: say so instead of staying silent.
-                    AutoStartNotifier(AndroidNoticeSink(context))
-                        .failed(AutomaticStartBranch.Restore, VpnError.PermissionDenied)
+                restoreOrNotify(wanted, consented, AutoStartNotifier(AndroidNoticeSink(context))) {
+                    ContextCompat.startForegroundService(context, ClientVpnService.restoreIntent(context))
                 }
             } finally {
                 pending.finish()
@@ -75,7 +60,22 @@ class BootReceiver : BroadcastReceiver() {
     }
 
     private companion object {
-        const val TAG = "BootReceiver"
         const val BOOT_READ_TIMEOUT_MS = 8_000L
+    }
+}
+
+/**
+ * The post-boot decision: restore when wanted and consented, otherwise tell the user
+ * instead of staying silent. FGS-start can still throw on edge states (API 31+) — a crash
+ * inside onReceive is worse than a missed restore, so a failed start becomes a notice.
+ */
+internal fun restoreOrNotify(wanted: Boolean, consented: Boolean, notifier: AutoStartNotifier, start: () -> Unit) {
+    if (wanted && consented) {
+        runCatching(start).onFailure {
+            SecureLog.w("BootReceiver", "boot restore start failed")
+            notifier.failed(AutomaticStartBranch.Restore, VpnError.Unexpected("boot restore start failed"))
+        }
+    } else if (wanted) {
+        notifier.failed(AutomaticStartBranch.Restore, VpnError.PermissionDenied)
     }
 }
