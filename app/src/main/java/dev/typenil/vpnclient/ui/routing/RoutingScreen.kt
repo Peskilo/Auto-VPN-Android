@@ -665,22 +665,31 @@ private fun RulesSection(
                     .padding(horizontal = 20.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Column(Modifier.weight(1f)) {
-                Text(
-                    rule.pattern,
-                    style = MaterialTheme.typography.bodyMedium,
-                    maxLines = 1,
-                )
-                Text(
-                    "${ruleKindLabel(rule.kind)} → ${ruleActionLabel(rule.action)}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+            // Text + switch toggle together (delete stays a separate button).
+            Row(
+                Modifier.weight(1f)
+                    .toggleable(
+                        value = rule.isEnabled,
+                        role = Role.Switch,
+                        onValueChange = { onToggle(rule, it) },
+                    )
+                    .heightIn(min = 48.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        rule.pattern,
+                        style = MaterialTheme.typography.bodyMedium,
+                        maxLines = 1,
+                    )
+                    Text(
+                        "${ruleKindLabel(rule.kind)} → ${ruleActionLabel(rule.action)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Switch(checked = rule.isEnabled, onCheckedChange = null)
             }
-            Switch(
-                checked = rule.isEnabled,
-                onCheckedChange = { onToggle(rule, it) },
-            )
             IconButton(onClick = { onDelete(rule.id) }) {
                 Icon(
                     Icons.Filled.Delete,

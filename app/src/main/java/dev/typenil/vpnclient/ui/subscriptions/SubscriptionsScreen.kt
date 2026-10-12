@@ -734,6 +734,9 @@ private fun SubscriptionDetailSheet(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    // Whole row toggles: TalkBack reads "Enabled, switch, on".
+                    .toggleable(value = profile.enabled, role = Role.Switch, onValueChange = onToggle)
+                    .heightIn(min = 48.dp)
                     .padding(horizontal = 20.dp, vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -754,7 +757,7 @@ private fun SubscriptionDetailSheet(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                Switch(checked = profile.enabled, onCheckedChange = onToggle)
+                Switch(checked = profile.enabled, onCheckedChange = null)
             }
 
             // --- manually imported nodes: per-node delete ---
