@@ -276,8 +276,10 @@ private fun ConnectionHero(state: VisualState, noServers: Boolean, delayMs: Int?
         Box(Modifier.matchParentSize()) {
             Image(painterResource(R.drawable.afterglow_mascot), contentDescription = null,
                 contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxHeight().aspectRatio(1f)
-                    .align(Alignment.CenterEnd).offset(x = 18.dp)
+                // Large fonts widen the headline — the art shrinks (bottom-right) instead of
+                // sitting under the text; unchanged at fontScale <= 1.3.
+                modifier = Modifier.fillMaxHeight(heroArtScale(fontScale)).aspectRatio(1f)
+                    .align(Alignment.BottomEnd).offset(x = 18.dp)
                     .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
                     .drawWithContent {
                         drawContent()
