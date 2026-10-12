@@ -506,6 +506,15 @@ private fun AddSubscriptionDialog(
         text = {
             // Scrollable: landscape/large fonts must still reach the actions.
             Column(Modifier.verticalScroll(rememberScrollState())) {
+                // Where the request goes, large: the field below shows the whole
+                // URL (token included) and is not masked, so the host is easy to miss.
+                subscriptionHost(url)?.let { host ->
+                    Text(
+                        stringResource(R.string.subs_add_host, host),
+                        style = MaterialTheme.typography.titleLarge,
+                        modifier = Modifier.padding(bottom = 8.dp),
+                    )
+                }
                 // Full-width field — sharing the row with Paste wrapped long
                 // localized labels through the outline.
                 OutlinedTextField(
