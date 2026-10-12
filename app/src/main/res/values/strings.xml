@@ -242,6 +242,8 @@
     <string name="home_stat_connections">Connections</string>
     <string name="home_stat_total_suffix">%1$s total</string>
     <string name="home_details_title">Session details</string>
+    <string name="home_stats_show">Details</string>
+    <string name="home_stats_hide">Hide details</string>
     <string name="home_details_node">Server</string>
     <string name="home_details_outbound">Outbound</string>
     <string name="home_details_pending">Pending reconnect</string>

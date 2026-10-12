@@ -147,6 +147,10 @@ class AfterglowHomeTest {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         // Session stats now sit below the server/routing card — a legitimate
         // scroll brings the row into view before tapping it.
+        // Stats are collapsed by default; the explicit toggle reveals the rows.
+        compose.onNodeWithText(context.getString(R.string.home_stats_show))
+            .performScrollTo()
+            .performClick()
         compose.onNodeWithText(context.getString(R.string.home_stat_connections))
             .performScrollTo()
             .performClick()
@@ -238,7 +242,7 @@ class AfterglowHomeTest {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         compose.onNodeWithText(context.getString(R.string.action_disconnect)).performClick()
         compose.runOnIdle { assertEquals(1, disconnects) }
-        compose.onNodeWithText(context.getString(R.string.home_stat_connections))
+        compose.onNodeWithText(context.getString(R.string.home_stats_show))
             .performScrollTo()
             .assertExists()
     }

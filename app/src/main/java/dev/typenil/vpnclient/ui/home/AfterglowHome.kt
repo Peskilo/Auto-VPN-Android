@@ -23,6 +23,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -120,6 +121,8 @@ internal fun AfterglowHomeContent(
     // Fonts wide enough to crowd two columns get one stacked layout instead.
     val compact = LocalDensity.current.fontScale > 1.3f ||
         LocalConfiguration.current.screenWidthDp < 340
+    // View-only: collapsed by default, survives rotation, never written to settings.
+    var statsExpanded by rememberSaveable { mutableStateOf(false) }
     Box(modifier.fillMaxSize().background(colors.paper)) {
         Column(Modifier.align(Alignment.TopCenter).fillMaxHeight()
             .widthIn(max = HomeContentMaxWidth).fillMaxWidth()
@@ -151,7 +154,7 @@ internal fun AfterglowHomeContent(
             // shortcuts trail them instead of pushing them below the fold.
             ServerAndRouting(ui.withAppliedServerOnRejection(), onPick, if (ui.noNodesAtAll) onAddServer else onOpenServers, onOpenRouting)
             if (state is VpnConnectionState.Connected) {
-                SessionStats(state, onOpenConnections, onOpenDetails)
+                SessionStats(state, onOpenConnections, onOpenDetails, statsExpanded) { statsExpanded = !statsExpanded }
             }
             Spacer(Modifier.height(18.dp))
             SectionHeader(stringResource(R.string.afterglow_quick_access),
@@ -586,6 +589,8 @@ private fun ServerAndRouting(ui: HomeUiState, onPick: () -> Unit, onAdd: () -> U
 private fun SessionStats(
     state: VpnConnectionState.Connected,
     onOpenConnections: () -> Unit,
+    expanded: Boolean,
+    onToggle: () -> Unit,
     onOpenDetails: () -> Unit,
 ) {
     val colors = AfterglowTheme.colors
@@ -627,54 +632,89 @@ private fun SessionStats(
     val s = stats.takeIf { fresh }
     val chartSamples = if (fresh) visibleSamples else emptyList()
     Column(Modifier.fillMaxWidth().border(1.dp, colors.border).background(colors.paperSecondary)) {
-        if (s != null) {
-            if (compact) {
-                // Side-by-side metrics can't survive large fonts/narrow
-                // widths — stack them at full width instead.
-                SpeedMetric(stringResource(R.string.home_stat_download), s.downlinkBytesPerSec,
-                    s.downlinkTotalBytes, chartSamples, displayNanos, true, colors.jade, Modifier.fillMaxWidth())
-                Box(Modifier.fillMaxWidth().height(1.dp).background(colors.border))
-                SpeedMetric(stringResource(R.string.home_stat_upload), s.uplinkBytesPerSec,
-                    s.uplinkTotalBytes, chartSamples, displayNanos, false, colors.coral, Modifier.fillMaxWidth())
-            } else {
-                Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
-                    SpeedMetric(stringResource(R.string.home_stat_download), s.downlinkBytesPerSec,
-                        s.downlinkTotalBytes, chartSamples, displayNanos, true, colors.jade, Modifier.weight(1f))
-                    Box(Modifier.width(1.dp).fillMaxHeight().background(colors.border))
-                    SpeedMetric(stringResource(R.string.home_stat_upload), s.uplinkBytesPerSec,
-                        s.uplinkTotalBytes, chartSamples, displayNanos, false, colors.coral, Modifier.weight(1f))
-                }
-            }
-        } else {
+        if (s == null) {
             // One compact state instead of two empty metric columns plus a
             // trailing explanation — same information, less noise.
             Text(stringResource(R.string.afterglow_stats_unavailable), color = colors.muted,
+        } else if (!expanded) {
+            // Collapsed: the two live rates only (session time sits in the header);
+            // charts, totals and technical rows stay behind "Details".
+            FlowRow(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(20.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                RateSummary(stringResource(R.string.home_stat_download), s.downlinkBytesPerSec, true)
+                RateSummary(stringResource(R.string.home_stat_upload), s.uplinkBytesPerSec, false)
+            }
+        } else if (compact) {
+            // Side-by-side metrics can't survive large fonts/narrow
+            // widths — stack them at full width instead.
+            SpeedMetric(stringResource(R.string.home_stat_download), s.downlinkBytesPerSec,
+                s.downlinkTotalBytes, chartSamples, displayNanos, true, colors.jade, Modifier.fillMaxWidth())
+            Box(Modifier.fillMaxWidth().height(1.dp).background(colors.border))
+            SpeedMetric(stringResource(R.string.home_stat_upload), s.uplinkBytesPerSec,
+                s.uplinkTotalBytes, chartSamples, displayNanos, false, colors.coral, Modifier.fillMaxWidth())
+        } else {
+            Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
+                SpeedMetric(stringResource(R.string.home_stat_download), s.downlinkBytesPerSec,
+                    s.downlinkTotalBytes, chartSamples, displayNanos, true, colors.jade, Modifier.weight(1f))
+                Box(Modifier.width(1.dp).fillMaxHeight().background(colors.border))
+                SpeedMetric(stringResource(R.string.home_stat_upload), s.uplinkBytesPerSec,
+                    s.uplinkTotalBytes, chartSamples, displayNanos, false, colors.coral, Modifier.weight(1f))
+            }
                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp))
         }
-        Box(Modifier.fillMaxWidth().height(1.dp).background(colors.border))
-        Row(Modifier.fillMaxWidth().semantics { role = Role.Button }
-            .clickable(onClick = onOpenConnections).heightIn(min = 48.dp)
-            .padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(stringResource(R.string.home_stat_connections), color = colors.ink,
-                fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-            // Light jade fails text contrast on paper — the direction
-            // glyphs take ink/coral; jade stays on the chart accents.
-            if (s != null) Row(verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(end = 10.dp)) {
-                Text("↓", color = colors.ink, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                Text(" ${s.connectionsIn}", color = colors.muted, fontSize = 13.sp)
-                Text("  ↑", color = colors.coral, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                Text(" ${s.connectionsOut}", color = colors.muted, fontSize = 13.sp)
+        if (expanded) {
+            Box(Modifier.fillMaxWidth().height(1.dp).background(colors.border))
+            Row(Modifier.fillMaxWidth().semantics { role = Role.Button }
+                .clickable(onClick = onOpenConnections).heightIn(min = 48.dp)
+                .padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(stringResource(R.string.home_stat_connections), color = colors.ink,
+                    fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                // Light jade fails text contrast on paper — the direction
+                // glyphs take ink/coral; jade stays on the chart accents.
+                if (s != null) Row(verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(end = 10.dp)) {
+                    Text("↓", color = colors.ink, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                    Text(" ${s.connectionsIn}", color = colors.muted, fontSize = 13.sp)
+                    Text("  ↑", color = colors.coral, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                    Text(" ${s.connectionsOut}", color = colors.muted, fontSize = 13.sp)
+                }
+                CircledChevron()
             }
-            CircledChevron()
+            Box(Modifier.fillMaxWidth().height(1.dp).background(colors.border))
+            Row(Modifier.fillMaxWidth().semantics { role = Role.Button }
+                .clickable(onClick = onOpenDetails).heightIn(min = 48.dp)
+                .padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(stringResource(R.string.home_details_title), color = colors.ink,
+                    fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                CircledChevron()
+            }
         }
+        // Explicit toggle: the label names the action, the chevron shows direction.
         Box(Modifier.fillMaxWidth().height(1.dp).background(colors.border))
         Row(Modifier.fillMaxWidth().semantics { role = Role.Button }
-            .clickable(onClick = onOpenDetails).heightIn(min = 48.dp)
+            .clickable(onClick = onToggle).heightIn(min = 48.dp)
             .padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(stringResource(R.string.home_details_title), color = colors.ink,
-                fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-            CircledChevron()
+            // Chevron hugs the label (not the far edge): the bar mascot perches there.
+            Text(stringResource(if (expanded) R.string.home_stats_hide else R.string.home_stats_show),
+                color = colors.coral, fontWeight = FontWeight.Bold)
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null,
+                tint = colors.coral, modifier = Modifier.size(24.dp).graphicsLayer { rotationZ = if (expanded) -90f else 90f })
+        }
+    }
+}
+
+@Composable
+private fun RateSummary(label: String, value: Long, download: Boolean) {
+    val colors = AfterglowTheme.colors
+    Row(verticalAlignment = Alignment.Bottom) {
+        // Ink/coral glyphs — light jade text fails contrast on paper.
+        Text(if (download) "↓" else "↑", color = if (download) colors.ink else colors.coral,
+            fontSize = 16.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(end = 6.dp, bottom = 2.dp))
+        Column {
+            Text(label, color = colors.muted, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(formatRate(value), color = colors.ink, fontSize = 20.sp, fontWeight = FontWeight.Bold,
+                maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }

@@ -248,6 +248,8 @@
     <string name="home_stat_connections">Соединения</string>
     <string name="home_stat_total_suffix">всего %1$s</string>
     <string name="home_details_title">Сведения о сеансе</string>
+    <string name="home_stats_show">Подробнее</string>
+    <string name="home_stats_hide">Скрыть подробности</string>
     <string name="home_details_node">Сервер</string>
     <string name="home_details_outbound">Исходящее соединение</string>
     <string name="home_details_pending">Ждут переподключения</string>
