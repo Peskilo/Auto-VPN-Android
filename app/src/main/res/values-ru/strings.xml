@@ -141,7 +141,7 @@
     <string name="routing_dns_mode">Режим DNS</string>
     <string name="routing_dns_upstream">DNS-сервер</string>
     <string name="routing_dns_applied">Сейчас применено: %1$s</string>
-    <string name="routing_dns_bootstrap_note">Имя самого DNS-сервера и имена узлов всегда резолвятся через системный резолвер — иначе возникла бы петля.</string>
+    <string name="routing_dns_bootstrap_note">Имя самого DNS-сервера и имена серверов всегда резолвятся через системный резолвер — иначе возникла бы петля.</string>
     <string name="routing_dns_custom_label">Свой сервер</string>
     <string name="routing_dns_custom_hint">https://dns.example/dns-query</string>
     <string name="routing_dns_custom_error">Некорректный сервер — используйте https://, tls://, quic://, udp:// или IP-адрес</string>
@@ -171,9 +171,9 @@
     <string name="routing_rule_action_proxy">Прокси</string>
     <string name="routing_rule_action_direct">Напрямую</string>
     <string name="routing_rule_action_block">Блокировать</string>
-    <string name="servers_node_menu">Настройки узла</string>
+    <string name="servers_node_menu">Настройки сервера</string>
     <string name="servers_rename">Переименовать</string>
-    <string name="servers_rename_title">Имя узла</string>
+    <string name="servers_rename_title">Имя сервера</string>
     <string name="servers_rename_hint">Пустое поле вернёт имя от провайдера</string>
     <string name="servers_enable">Включить</string>
     <string name="servers_disable">Отключить</string>
@@ -260,8 +260,8 @@
     <string name="servers_connection_blocked">Подключение заблокировано</string>
     <string name="home_selection_unencrypted">Выбор не применён: удалённый сервер не шифруется. Текущий туннель не изменён.</string>
     <string name="servers_unencrypted">Не шифруется</string>
-    <string name="servers_local_sidecar">Исключение для локального sidecar</string>
-    <string name="home_error_unencrypted">Нешифрованные удалённые соединения запрещены. Выберите сервер с шифрованием или локальный sidecar.</string>
+    <string name="servers_local_sidecar">Исключение для сервера на этом устройстве</string>
+    <string name="home_error_unencrypted">Незашифрованные соединения с удалёнными серверами запрещены. Выберите сервер с шифрованием или сервер на этом устройстве.</string>
     <string name="home_error_no_node">Сервер не выбран — выберите его на вкладке «Серверы»</string>
     <string name="home_error_config">Неверная конфигурация: %1$s</string>
     <string name="home_error_engine">Сбой ядра VPN: %1$s</string>
@@ -317,10 +317,10 @@
     <string name="servers_filter_all">Все</string>
     <string name="servers_filter_reset">Сбросить</string>
     <string name="servers_test_latency">Проверить задержку</string>
-    <string name="servers_latency_next_proxy">Проверит: через узел (HEAD)</string>
+    <string name="servers_latency_next_proxy">Проверит: через сервер (HEAD)</string>
     <string name="servers_latency_next_tcp">Проверит: доступность порта (TCP)</string>
     <string name="servers_latency_method_tcp">порт доступен (TCP)</string>
-    <string name="servers_latency_method_proxy">через узел (HEAD)</string>
+    <string name="servers_latency_method_proxy">через сервер (HEAD)</string>
     <string name="servers_latency_earlier">ранее</string>
     <string name="servers_latency_stale">устарело</string>
     <string name="servers_latency_stop">Остановить</string>
@@ -341,10 +341,10 @@
     <string name="servers_tls_mode_reality">Reality-рукопожатие</string>
     <string name="servers_tls_mode_unknown">Нераспознанная конфигурация TLS</string>
     <string name="servers_tls_insecure_row">Проверка сертификата</string>
-    <string name="servers_tls_insecure_disabled">Отключена в конфигурации узла (insecure)</string>
+    <string name="servers_tls_insecure_disabled">Отключена в конфигурации сервера (insecure)</string>
     <string name="servers_tls_sni">Имя сервера (SNI)</string>
     <string name="servers_tls_alpn">ALPN</string>
-    <string name="servers_tls_note">Прочитано из сохранённой конфигурации узла — фактическое TLS-рукопожатие здесь не проверяется.</string>
+    <string name="servers_tls_note">Прочитано из сохранённой конфигурации сервера — фактическое TLS-рукопожатие здесь не проверяется.</string>
 
     <!-- Settings -->
     <string name="settings_snackbar_reconnect_message">Переподключите VPN, чтобы применить новые настройки</string>
