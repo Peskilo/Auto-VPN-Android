@@ -244,6 +244,10 @@
     <string name="home_details_title">Session details</string>
     <string name="home_stats_show">Details</string>
     <string name="home_stats_hide">Hide details</string>
+    <string name="a11y_expanded">Expanded</string>
+    <string name="a11y_collapsed">Collapsed</string>
+    <string name="a11y_sheet_handle">Drag handle</string>
+    <string name="home_stat_connections_desc">Incoming %1$d, outgoing %2$d</string>
     <string name="home_details_node">Server</string>
     <string name="home_details_outbound">Outbound</string>
     <string name="home_details_pending">Pending reconnect</string>

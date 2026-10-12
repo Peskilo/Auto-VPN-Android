@@ -82,6 +82,7 @@ import dev.typenil.vpnclient.core.common.log.SecureLog
 import java.util.concurrent.Executors
 import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
+import dev.typenil.vpnclient.ui.common.headingSemantics
 
 private const val TAG = "QrScan"
 
@@ -165,7 +166,7 @@ fun QrScanScreen(
                     contentDescription = stringResource(R.string.common_back),
                 )
             }
-            Text(stringResource(R.string.qr_title), style = MaterialTheme.typography.titleLarge)
+            Text(stringResource(R.string.qr_title), Modifier.headingSemantics(), style = MaterialTheme.typography.titleLarge)
         }
 
         when {

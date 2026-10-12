@@ -26,8 +26,13 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import dev.typenil.vpnclient.R
+import dev.typenil.vpnclient.ui.common.headingSemantics
 
 /**
  * Real vertical space the sheet gave its content — bounded by the visible
@@ -61,8 +66,12 @@ fun AfterglowSheet(
             androidx.compose.ui.graphics.Color.Black
                 .copy(alpha = .55f),
         dragHandle = {
+            val handleLabel = stringResource(R.string.a11y_sheet_handle)
             Box(
                 Modifier
+                    // Material makes the handle a focusable expand/dismiss target;
+                    // without a label TalkBack announces an unnamed control.
+                    .semantics { contentDescription = handleLabel }
                     .padding(top = 12.dp, bottom = 16.dp)
                     .size(width = 32.dp, height = 4.dp)
                     .background(colors.border, RoundedCornerShape(4.dp)),
@@ -96,7 +105,7 @@ fun AfterglowSheetHeader(
             // two lines; full names stay editable in the rename form.
             maxLines = 2,
             overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.weight(1f).headingSemantics(),
         )
         IconButton(onClick = onDismiss, modifier = Modifier.size(48.dp)) {
             Icon(Icons.Default.Close, contentDescription = closeLabel, tint = colors.ink)

@@ -58,6 +58,7 @@ import dev.typenil.vpnclient.core.subscription.ImportUrlExtractor.ExtractedImpor
 import dev.typenil.vpnclient.core.vpn.ConnectionManager
 import dev.typenil.vpnclient.data.settings.SettingsRepository
 import dev.typenil.vpnclient.ui.appfilter.AppFilterScreen
+import dev.typenil.vpnclient.ui.common.headingSemantics
 import dev.typenil.vpnclient.ui.connections.ConnectionsScreen
 import dev.typenil.vpnclient.ui.diagnostics.DiagnosticsScreen
 import dev.typenil.vpnclient.ui.home.HomeScreen
@@ -238,7 +239,7 @@ fun VpnApp(
                             }
                             Text(stringResource(R.string.nav_settings), color = colors.ink,
                                 fontSize = 18.sp, fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(start = 8.dp))
+                                modifier = Modifier.headingSemantics().padding(start = 8.dp))
                         }
                         SettingsScreen(
                             onOpenRouting = { activeSheet = Routes.ROUTING },

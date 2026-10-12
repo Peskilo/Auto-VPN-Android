@@ -16,6 +16,7 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import dev.typenil.vpnclient.ui.common.headingSemantics
 import dev.typenil.vpnclient.ui.theme.AfterglowCheckbox as Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -62,7 +63,7 @@ fun AppFilterScreen(
                     contentDescription = stringResource(R.string.common_back),
                 )
             }
-            Text(stringResource(R.string.common_per_app_vpn), style = MaterialTheme.typography.titleLarge)
+            Text(stringResource(R.string.common_per_app_vpn), Modifier.headingSemantics(), style = MaterialTheme.typography.titleLarge)
         }
 
         Column(Modifier.selectableGroup()) {

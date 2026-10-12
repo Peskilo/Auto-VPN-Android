@@ -250,6 +250,10 @@
     <string name="home_details_title">Сведения о сеансе</string>
     <string name="home_stats_show">Подробнее</string>
     <string name="home_stats_hide">Скрыть подробности</string>
+    <string name="a11y_expanded">Развёрнуто</string>
+    <string name="a11y_collapsed">Свёрнуто</string>
+    <string name="a11y_sheet_handle">Маркер панели</string>
+    <string name="home_stat_connections_desc">Входящих %1$d, исходящих %2$d</string>
     <string name="home_details_node">Сервер</string>
     <string name="home_details_outbound">Исходящее соединение</string>
     <string name="home_details_pending">Ждут переподключения</string>

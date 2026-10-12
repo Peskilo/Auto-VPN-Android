@@ -53,6 +53,7 @@ import dev.typenil.vpnclient.core.vpn.VpnConnectionState
 import dev.typenil.vpnclient.ui.common.CORE_VERSION
 import dev.typenil.vpnclient.ui.common.DetailRow
 import dev.typenil.vpnclient.ui.common.appliedDnsSummary
+import dev.typenil.vpnclient.ui.common.headingSemantics
 import dev.typenil.vpnclient.ui.common.localizedResources
 import dev.typenil.vpnclient.ui.common.perAppSummary
 import dev.typenil.vpnclient.ui.common.routeModeSummary
@@ -85,7 +86,7 @@ fun DiagnosticsScreen(
                     contentDescription = stringResource(R.string.common_back),
                 )
             }
-            Text(stringResource(R.string.diag_title), style = MaterialTheme.typography.titleLarge)
+            Text(stringResource(R.string.diag_title), Modifier.headingSemantics(), style = MaterialTheme.typography.titleLarge)
         }
 
         val none = stringResource(R.string.common_none)
@@ -208,7 +209,7 @@ fun DiagnosticsScreen(
 @Composable
 private fun HealthTable(health: ConnectionHealth) {
     Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(stringResource(R.string.health_title), style = MaterialTheme.typography.titleMedium)
+        Text(stringResource(R.string.health_title), Modifier.headingSemantics(), style = MaterialTheme.typography.titleMedium)
         health.observations.forEach { observation ->
             Column {
                 DetailRow(healthLabel(observation.level), healthLabel(observation.status))

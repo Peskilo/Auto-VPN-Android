@@ -48,7 +48,11 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -58,6 +62,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
 import dev.typenil.vpnclient.R
 import dev.typenil.vpnclient.core.vpn.VpnConnectionState
+import dev.typenil.vpnclient.ui.common.disclosureSemantics
 import dev.typenil.vpnclient.ui.common.formatBytes
 import dev.typenil.vpnclient.ui.common.formatRate
 import dev.typenil.vpnclient.ui.common.routeModeSummary
@@ -213,7 +218,7 @@ private val HomeContentMaxWidth = 560.dp
 @Composable
 internal fun SectionHeader(text: String, modifier: Modifier = Modifier) {
     Text(text.uppercase(), color = AfterglowTheme.colors.coral, fontWeight = FontWeight.Bold,
-        fontSize = 11.sp, letterSpacing = 1.sp, modifier = modifier)
+        fontSize = 11.sp, letterSpacing = 1.sp, modifier = modifier.semantics { heading() })
 }
 
 @Composable
@@ -265,7 +270,6 @@ private fun ConnectionHero(state: VisualState, noServers: Boolean, delayMs: Int?
     // Landscape keeps a working viewport — compact hero, same type sizes.
     val heroMin = if (isShortWindow(LocalConfiguration.current.screenHeightDp)) 128f else 164f
     Box(Modifier.fillMaxWidth().heightIn(min = if (largeFont) (heroMin + (fontScale - 1.3f) * 85f).dp else heroMin.dp)
-        .semantics { stateDescription = headline }
         .clip(AfterglowTokens.cardShape).background(Brush.horizontalGradient(listOf(base, base, colors.actionSurface)))) {
         Spacer(Modifier.fillMaxWidth().height(heroMin.dp))
         // Decorative artwork never participates in the hero's measurement.
@@ -290,8 +294,10 @@ private fun ConnectionHero(state: VisualState, noServers: Boolean, delayMs: Int?
                 color = stateColors.onHeroMuted, fontSize = 10.sp,
                 fontWeight = FontWeight.Bold, letterSpacing = .8.sp,
                 modifier = Modifier.padding(bottom = 8.dp))
+            // Only the state headline announces changes — never the latency/stats.
             Text(headline, color = stateColors.onHero, fontWeight = FontWeight.Bold,
-                fontSize = 28.sp, lineHeight = 33.sp)
+                fontSize = 28.sp, lineHeight = 33.sp,
+                modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
             HeroLatency(delayMs, stateColors.onHero, Modifier.padding(top = 8.dp))
         }
         Box(Modifier.fillMaxWidth().height(3.dp).align(Alignment.BottomCenter)
@@ -642,6 +648,8 @@ private fun SessionStats(
             color = colors.muted, fontSize = 12.sp)
     }
     val s = stats.takeIf { fresh }
+    val connectionsDesc = if (s == null) "" else
+        stringResource(R.string.home_stat_connections_desc, s.connectionsIn, s.connectionsOut)
     val chartSamples = if (fresh) visibleSamples else emptyList()
     Column(Modifier.fillMaxWidth().border(1.dp, colors.border).background(colors.paperSecondary)) {
         if (s == null) {
@@ -685,7 +693,9 @@ private fun SessionStats(
                 // Light jade fails text contrast on paper — the direction
                 // glyphs take ink/coral; jade stays on the chart accents.
                 if (s != null) Row(verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(end = 10.dp)) {
+                    modifier = Modifier.padding(end = 10.dp).clearAndSetSemantics {
+                        contentDescription = connectionsDesc
+                    }) {
                     Text("↓", color = colors.ink, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                     Text(" ${s.connectionsIn}", color = colors.muted, fontSize = 13.sp)
                     Text("  ↑", color = colors.coral, fontSize = 14.sp, fontWeight = FontWeight.Bold)
@@ -704,7 +714,7 @@ private fun SessionStats(
         }
         Box(Modifier.fillMaxWidth().height(1.dp).background(colors.border))
         // Explicit toggle: the label names the action, the chevron shows direction.
-        Row(Modifier.fillMaxWidth().semantics { role = Role.Button }
+        Row(Modifier.fillMaxWidth().disclosureSemantics(expanded)
             .clickable(onClick = onToggle).heightIn(min = 48.dp)
             .padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
             // Chevron hugs the label (not the far edge): the bar mascot perches there.
@@ -720,9 +730,11 @@ private fun SessionStats(
 private fun RateSummary(label: String, value: Long, download: Boolean) {
     val colors = AfterglowTheme.colors
     Row(verticalAlignment = Alignment.Bottom) {
-        // Ink/coral glyphs — light jade text fails contrast on paper.
+        // Ink/coral glyphs — light jade text fails contrast on paper. The glyph is
+        // decorative: the label beside it names the direction.
         Text(if (download) "↓" else "↑", color = if (download) colors.ink else colors.coral,
-            fontSize = 16.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(end = 6.dp, bottom = 2.dp))
+            fontSize = 16.sp, fontWeight = FontWeight.Bold,
+            modifier = Modifier.clearAndSetSemantics {}.padding(end = 6.dp, bottom = 2.dp))
         Column {
             Text(label, color = colors.muted, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(formatRate(value), color = colors.ink, fontSize = 20.sp, fontWeight = FontWeight.Bold,
@@ -739,7 +751,8 @@ private fun SpeedMetric(label: String, value: Long, totalBytes: Long, samples: L
         Row(verticalAlignment = Alignment.CenterVertically) {
             // Ink/coral glyphs — light jade text fails contrast on paper.
             Text(if (download) "↓" else "↑", color = if (download) colors.ink else colors.coral,
-                fontSize = 15.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(end = 4.dp))
+                fontSize = 15.sp, fontWeight = FontWeight.Bold,
+                modifier = Modifier.clearAndSetSemantics {}.padding(end = 4.dp))
             Text(label, color = colors.muted, fontSize = 12.sp, maxLines = 1,
                 overflow = TextOverflow.Ellipsis)
         }

@@ -37,6 +37,7 @@ import dev.typenil.vpnclient.ui.common.formatRelativeTime
 import java.time.Instant
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import dev.typenil.vpnclient.ui.common.headingSemantics
 
 /**
  * Live connections through the tunnel. Everything rendered here is user
@@ -61,7 +62,7 @@ fun ConnectionsScreen(
                     contentDescription = stringResource(R.string.common_back),
                 )
             }
-            Text(stringResource(R.string.conn_title), style = MaterialTheme.typography.titleLarge)
+            Text(stringResource(R.string.conn_title), Modifier.headingSemantics(), style = MaterialTheme.typography.titleLarge)
         }
 
         when {

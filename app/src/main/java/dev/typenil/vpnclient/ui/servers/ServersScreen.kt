@@ -32,6 +32,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.outlined.Star
+import dev.typenil.vpnclient.ui.common.headingSemantics
 import dev.typenil.vpnclient.ui.theme.AfterglowDialog as AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -454,7 +455,7 @@ private fun FilterHeader(text: String) {
         text,
         style = MaterialTheme.typography.labelMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(top = 8.dp, bottom = 2.dp),
+        modifier = Modifier.headingSemantics().padding(top = 8.dp, bottom = 2.dp),
     )
 }
 
