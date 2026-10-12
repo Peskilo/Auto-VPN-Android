@@ -1,5 +1,31 @@
 <resources>
     <string name="app_name">VPN Client</string>
+    <string name="format_unit_b">Б</string>
+    <string name="format_unit_kb">КБ</string>
+    <string name="format_unit_mb">МБ</string>
+    <string name="format_unit_gb">ГБ</string>
+    <string name="format_unit_tb">ТБ</string>
+    <string name="format_rate">%1$s/с</string>
+    <string name="relative_now">только что</string>
+    <string name="relative_never">никогда</string>
+    <plurals name="relative_minutes_ago">
+        <item quantity="one">%1$d минуту назад</item>
+        <item quantity="few">%1$d минуты назад</item>
+        <item quantity="many">%1$d минут назад</item>
+        <item quantity="other">%1$d минуты назад</item>
+    </plurals>
+    <plurals name="relative_hours_ago">
+        <item quantity="one">%1$d час назад</item>
+        <item quantity="few">%1$d часа назад</item>
+        <item quantity="many">%1$d часов назад</item>
+        <item quantity="other">%1$d часа назад</item>
+    </plurals>
+    <plurals name="relative_days_ago">
+        <item quantity="one">%1$d день назад</item>
+        <item quantity="few">%1$d дня назад</item>
+        <item quantity="many">%1$d дней назад</item>
+        <item quantity="other">%1$d дня назад</item>
+    </plurals>
 
     <string name="health_title">Свидетельства работоспособности</string>
     <string name="health_evidence">%1$s · Источник: %2$s · Область: %3$s · %4$s · Поколение: %5$d</string>
@@ -267,10 +293,18 @@
     <string name="home_uptime_ms">%1$d мин %2$d с</string>
     <string name="home_uptime_s">%1$d с</string>
     <string name="home_uptime_dhm">%1$d д %2$d ч %3$d мин</string>
-    <string name="home_per_app_include">Через VPN: %1$d приложений</string>
-    <string name="home_per_app_include_one">Через VPN: %1$d приложение</string>
-    <string name="home_per_app_exclude">Без VPN: %1$d приложений</string>
-    <string name="home_per_app_exclude_one">Без VPN: %1$d приложение</string>
+    <plurals name="home_per_app_include">
+        <item quantity="one">Через VPN: %1$d приложение</item>
+        <item quantity="few">Через VPN: %1$d приложения</item>
+        <item quantity="many">Через VPN: %1$d приложений</item>
+        <item quantity="other">Через VPN: %1$d приложения</item>
+    </plurals>
+    <plurals name="home_per_app_exclude">
+        <item quantity="one">Без VPN: %1$d приложение</item>
+        <item quantity="few">Без VPN: %1$d приложения</item>
+        <item quantity="many">Без VPN: %1$d приложений</item>
+        <item quantity="other">Без VPN: %1$d приложения</item>
+    </plurals>
     <string name="home_auto_subtitle">Быстрый доступный сервер</string>
     <string name="home_connect">Подключить</string>
 
@@ -289,10 +323,6 @@
     <string name="servers_latency_method_proxy">через узел (HEAD)</string>
     <string name="servers_latency_earlier">ранее</string>
     <string name="servers_latency_stale">устарело</string>
-    <string name="servers_latency_age_now">только что</string>
-    <string name="servers_latency_age_min">%1$d мин назад</string>
-    <string name="servers_latency_age_hour">%1$d ч назад</string>
-    <string name="servers_latency_age_day">%1$d д назад</string>
     <string name="servers_latency_stop">Остановить</string>
     <string name="servers_latency_progress">%1$d / %2$d</string>
     <string name="servers_no_match">Нет серверов по текущим фильтрам</string>
@@ -375,7 +405,12 @@
     <string name="diag_ip_network">сетевая ошибка (%1$s)</string>
     <string name="diag_ip_not_connected">Нет подключения — запрос идёт напрямую, не через туннель</string>
     <string name="diag_export_log">Экспорт лога</string>
-    <string name="diag_export_log_sub">Приложение: до %1$d строк; ядро: до 500 предупреждений/ошибок. Без секретов, экспорт из памяти.</string>
+    <plurals name="diag_export_log_sub">
+        <item quantity="one">Приложение: до %1$d строки; ядро: до 500 предупреждений/ошибок. Без секретов, экспорт из памяти.</item>
+        <item quantity="few">Приложение: до %1$d строк; ядро: до 500 предупреждений/ошибок. Без секретов, экспорт из памяти.</item>
+        <item quantity="many">Приложение: до %1$d строк; ядро: до 500 предупреждений/ошибок. Без секретов, экспорт из памяти.</item>
+        <item quantity="other">Приложение: до %1$d строки; ядро: до 500 предупреждений/ошибок. Без секретов, экспорт из памяти.</item>
+    </plurals>
     <string name="diag_core_log_title">Лог ядра — предупреждения и ошибки (без секретов)</string>
     <string name="diag_core_log_empty">В текущем сеансе движка нет предупреждений или ошибок ядра.</string>
     <string name="diag_core_log_previous">Предыдущая сессия</string>
@@ -389,7 +424,12 @@
     <string name="subs_delete_confirm_text">\"%1$s\" и её серверы будут удалены.</string>
     <string name="subs_manual_hint">Вручную — вставьте ссылки, чтобы добавить</string>
     <string name="subs_manual_sheet_hint">Вручную — локальные ссылки</string>
-    <string name="subs_card_meta">%1$d серверов · обновлено %2$s</string>
+    <plurals name="subs_card_meta">
+        <item quantity="one">%1$d сервер · обновлено %2$s</item>
+        <item quantity="few">%1$d сервера · обновлено %2$s</item>
+        <item quantity="many">%1$d серверов · обновлено %2$s</item>
+        <item quantity="other">%1$d сервера · обновлено %2$s</item>
+    </plurals>
     <string name="subs_card_updates_on_launch"> · обновляется при запуске</string>
     <string name="subs_card_disabled"> · отключена</string>
     <string name="subs_usage_of">Использовано %1$s из %2$s</string>

@@ -20,6 +20,7 @@ import android.os.PowerManager
 import androidx.core.content.ContextCompat
 import dagger.hilt.android.AndroidEntryPoint
 import dev.typenil.vpnclient.R
+import dev.typenil.vpnclient.core.common.formatRate
 import dev.typenil.vpnclient.core.common.VpnSocketProtector
 import dev.typenil.vpnclient.core.common.log.SecureLog
 import dev.typenil.vpnclient.core.engine.EngineConfig
@@ -411,7 +412,7 @@ class ClientVpnService :
                             NotificationSpec(
                                 title = getString(R.string.notification_connected),
                                 text =
-                                    listOfNotNull(state.node.name, rateText(state.stats))
+                                    listOfNotNull(state.node.name, rateText(state.stats, resources::formatRate))
                                         .joinToString(" · "),
                                 showDisconnect = true,
                             )

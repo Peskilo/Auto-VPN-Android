@@ -1,5 +1,25 @@
 <resources>
     <string name="app_name">VPN Client</string>
+    <string name="format_unit_b">B</string>
+    <string name="format_unit_kb">KB</string>
+    <string name="format_unit_mb">MB</string>
+    <string name="format_unit_gb">GB</string>
+    <string name="format_unit_tb">TB</string>
+    <string name="format_rate">%1$s/s</string>
+    <string name="relative_now">just now</string>
+    <string name="relative_never">never</string>
+    <plurals name="relative_minutes_ago">
+        <item quantity="one">%1$d minute ago</item>
+        <item quantity="other">%1$d minutes ago</item>
+    </plurals>
+    <plurals name="relative_hours_ago">
+        <item quantity="one">%1$d hour ago</item>
+        <item quantity="other">%1$d hours ago</item>
+    </plurals>
+    <plurals name="relative_days_ago">
+        <item quantity="one">%1$d day ago</item>
+        <item quantity="other">%1$d days ago</item>
+    </plurals>
 
     <string name="health_title">Connection health evidence</string>
     <string name="health_evidence">%1$s · Source: %2$s · Scope: %3$s · %4$s · Generation: %5$d</string>
@@ -267,10 +287,14 @@
     <string name="home_uptime_ms">%1$d min %2$d s</string>
     <string name="home_uptime_s">%1$d s</string>
     <string name="home_uptime_dhm">%1$d d %2$d h %3$d min</string>
-    <string name="home_per_app_include">Include %1$d apps</string>
-    <string name="home_per_app_include_one">Include %1$d app</string>
-    <string name="home_per_app_exclude">Exclude %1$d apps</string>
-    <string name="home_per_app_exclude_one">Exclude %1$d app</string>
+    <plurals name="home_per_app_include">
+        <item quantity="one">Include %1$d app</item>
+        <item quantity="other">Include %1$d apps</item>
+    </plurals>
+    <plurals name="home_per_app_exclude">
+        <item quantity="one">Exclude %1$d app</item>
+        <item quantity="other">Exclude %1$d apps</item>
+    </plurals>
     <string name="home_auto_subtitle">Fastest available server</string>
     <string name="home_connect">Connect</string>
 
@@ -289,10 +313,6 @@
     <string name="servers_latency_method_proxy">via node (HEAD)</string>
     <string name="servers_latency_earlier">earlier</string>
     <string name="servers_latency_stale">outdated</string>
-    <string name="servers_latency_age_now">just now</string>
-    <string name="servers_latency_age_min">%1$d min ago</string>
-    <string name="servers_latency_age_hour">%1$d h ago</string>
-    <string name="servers_latency_age_day">%1$d d ago</string>
     <string name="servers_latency_stop">Stop</string>
     <string name="servers_latency_progress">%1$d / %2$d</string>
     <string name="servers_no_match">No servers match the current filters</string>
@@ -375,7 +395,10 @@
     <string name="diag_ip_network">network error (%1$s)</string>
     <string name="diag_ip_not_connected">Not connected — the probe goes direct, not through the tunnel</string>
     <string name="diag_export_log">Export log</string>
-    <string name="diag_export_log_sub">App: up to %1$d lines; core: up to 500 warn/error lines. Redacted, shared from memory.</string>
+    <plurals name="diag_export_log_sub">
+        <item quantity="one">App: up to %1$d line; core: up to 500 warn/error lines. Redacted, shared from memory.</item>
+        <item quantity="other">App: up to %1$d lines; core: up to 500 warn/error lines. Redacted, shared from memory.</item>
+    </plurals>
     <string name="diag_core_log_title">Core log — warnings and errors (redacted)</string>
     <string name="diag_core_log_empty">No core warnings or errors in the current engine session.</string>
     <string name="diag_core_log_previous">Previous session</string>
@@ -389,7 +412,10 @@
     <string name="subs_delete_confirm_text">\"%1$s\" and its servers will be removed.</string>
     <string name="subs_manual_hint">Manual — paste share links to add</string>
     <string name="subs_manual_sheet_hint">Manual — local share links</string>
-    <string name="subs_card_meta">%1$d nodes · updated %2$s</string>
+    <plurals name="subs_card_meta">
+        <item quantity="one">%1$d server · updated %2$s</item>
+        <item quantity="other">%1$d servers · updated %2$s</item>
+    </plurals>
     <string name="subs_card_updates_on_launch"> · updates on launch</string>
     <string name="subs_card_disabled"> · disabled</string>
     <string name="subs_usage_of">Used %1$s of %2$s</string>

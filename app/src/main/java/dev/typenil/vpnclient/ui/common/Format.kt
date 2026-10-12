@@ -1,32 +1,73 @@
 package dev.typenil.vpnclient.ui.common
 
+import android.content.res.Resources
+import dev.typenil.vpnclient.R
 import java.time.Duration
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
-import dev.typenil.vpnclient.core.common.formatBytes as coreFormatBytes
-import dev.typenil.vpnclient.core.common.formatRate as coreFormatRate
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
+import dev.typenil.vpnclient.core.common.formatBytes
+import dev.typenil.vpnclient.core.common.formatRate
 
-// Byte/rate formatting lives in core.common so the service layer can use it
-// without a UI dependency; these aliases keep existing call sites working.
+/** Resources for the current UI locale; re-read when the configuration changes. */
+@Composable
+@ReadOnlyComposable
+fun localizedResources(): Resources {
+    LocalConfiguration.current
+    return LocalContext.current.resources
+}
 
-/** Human-readable byte counts: `512 B`, `1.5 KB`, `2.0 MB`… */
-fun formatBytes(bytes: Long): String = coreFormatBytes(bytes)
+/** Localized byte count: `512 B` / `512 Б`. */
+@Composable
+@ReadOnlyComposable
+fun formatBytes(bytes: Long): String = localizedResources().formatBytes(bytes)
 
-/** `1.5 MB/s` style rates. */
-fun formatRate(bytesPerSec: Long): String = coreFormatRate(bytesPerSec)
+/** Localized rate: `1.5 MB/s` / `1,5 МБ/с`. */
+@Composable
+@ReadOnlyComposable
+fun formatRate(bytesPerSec: Long): String = localizedResources().formatRate(bytesPerSec)
 
-/** "just now" / "5 min ago" / "3 h ago" / "2 d ago", or "never" for null. */
-fun formatRelativeTime(instant: Instant?, now: Instant = Instant.now()): String {
-    if (instant == null) return "never"
-    val seconds = Duration.between(instant, now).seconds.coerceAtLeast(0)
-    return when {
-        seconds < 60 -> "just now"
-        seconds < 3_600 -> "${seconds / 60} min ago"
-        seconds < 86_400 -> "${seconds / 3_600} h ago"
-        else -> "${seconds / 86_400} d ago"
+enum class RelativeUnit { Now, Minutes, Hours, Days }
+
+/** Age rounded down into the largest whole unit; pure so the buckets are testable. */
+data class RelativeAge(val unit: RelativeUnit, val count: Int)
+
+fun relativeAge(ageMs: Long): RelativeAge =
+    when {
+        ageMs < 60_000L -> RelativeAge(RelativeUnit.Now, 0)
+        ageMs < 3_600_000L -> RelativeAge(RelativeUnit.Minutes, (ageMs / 60_000L).toInt())
+        ageMs < 86_400_000L -> RelativeAge(RelativeUnit.Hours, (ageMs / 3_600_000L).toInt())
+        else -> RelativeAge(RelativeUnit.Days, (ageMs / 86_400_000L).toInt())
+    }
+
+/** "just now" / "5 minutes ago" — plural forms come from `<plurals>` (ru: one/few/many). */
+fun Resources.relativeTimeText(ageMs: Long): String {
+    val age = relativeAge(ageMs.coerceAtLeast(0))
+    return when (age.unit) {
+        RelativeUnit.Now -> getString(R.string.relative_now)
+        RelativeUnit.Minutes -> getQuantityString(R.plurals.relative_minutes_ago, age.count, age.count)
+        RelativeUnit.Hours -> getQuantityString(R.plurals.relative_hours_ago, age.count, age.count)
+        RelativeUnit.Days -> getQuantityString(R.plurals.relative_days_ago, age.count, age.count)
     }
 }
+
+/** Age of [instant], or "never" for null. */
+fun Resources.formatRelativeTime(instant: Instant?, now: Instant = Instant.now()): String =
+    if (instant == null) getString(R.string.relative_never)
+    else relativeTimeText(Duration.between(instant, now).toMillis())
+
+@Composable
+@ReadOnlyComposable
+fun relativeTimeText(ageMs: Long): String = localizedResources().relativeTimeText(ageMs)
+
+@Composable
+@ReadOnlyComposable
+fun formatRelativeTime(instant: Instant?, now: Instant = Instant.now()): String =
+    localizedResources().formatRelativeTime(instant, now)
 
 /**
  * Whole-unit pieces of a session duration, consumed by the localized

@@ -84,6 +84,7 @@ import dev.typenil.vpnclient.ui.common.DetailRow
 import dev.typenil.vpnclient.ui.common.formatBytes
 import dev.typenil.vpnclient.ui.common.formatDate
 import dev.typenil.vpnclient.ui.common.formatRelativeTime
+import dev.typenil.vpnclient.ui.common.localizedResources
 import okhttp3.HttpUrl.Companion.toHttpUrl
 
 /**
@@ -397,8 +398,9 @@ private fun SubscriptionCard(
 
             Spacer(Modifier.height(4.dp))
             Text(
-                text = stringResource(
-                    R.string.subs_card_meta,
+                text = localizedResources().getQuantityString(
+                    R.plurals.subs_card_meta,
+                    nodeCount,
                     nodeCount,
                     formatRelativeTime(profile.lastUpdatedAt),
                 ) +

@@ -130,7 +130,11 @@ private fun ConnectionRow(
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
-                text = metaLine(connection, appLabel),
+                text = metaLine(
+                    connection,
+                    appLabel,
+                    formatRelativeTime(Instant.ofEpochMilli(connection.createdAtMs)),
+                ),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
@@ -171,14 +175,12 @@ private fun ConnectionRow(
 
 /** "App · tcp · tls · 5 min ago" — label falls back to the package name.
  *  Internal for JVM tests. */
-internal fun metaLine(connection: ConnectionInfo, appLabel: String?): String {
+internal fun metaLine(connection: ConnectionInfo, appLabel: String?, relativeTime: String? = null): String {
     val parts = mutableListOf<String>()
     connection.packages.firstOrNull()?.let { parts += appLabel ?: it }
     if (connection.network.isNotEmpty()) parts += connection.network
     if (connection.protocol.isNotEmpty()) parts += connection.protocol
-    if (connection.createdAtMs > 0) {
-        parts += formatRelativeTime(Instant.ofEpochMilli(connection.createdAtMs))
-    }
+    if (connection.createdAtMs > 0 && relativeTime != null) parts += relativeTime
     return parts.joinToString(" · ")
 }
 

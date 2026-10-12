@@ -74,6 +74,7 @@ import dev.typenil.vpnclient.core.subscription.model.NodeSelection
 import dev.typenil.vpnclient.ui.theme.AfterglowTheme
 import dev.typenil.vpnclient.data.LatencyMethod
 import dev.typenil.vpnclient.data.NodeLatency
+import dev.typenil.vpnclient.ui.common.relativeTimeText
 import dev.typenil.vpnclient.ui.theme.AfterglowTokens
 import dev.typenil.vpnclient.ui.theme.LocalSheetMaxHeight
 
@@ -861,16 +862,6 @@ private fun TlsDetailRow(
     }
 }
 
-/** Age bucket of a stored verdict as (string resource, value) — compact units
- *  so no plural rules are needed in either language. */
-internal fun latencyAgeLabel(ageMs: Long): Pair<Int, Int> =
-    when {
-        ageMs < 60_000L -> R.string.servers_latency_age_now to 0
-        ageMs < 3_600_000L -> R.string.servers_latency_age_min to (ageMs / 60_000L).toInt()
-        ageMs < 86_400_000L -> R.string.servers_latency_age_hour to (ageMs / 3_600_000L).toInt()
-        else -> R.string.servers_latency_age_day to (ageMs / 86_400_000L).toInt()
-    }
-
 /** A persisted verdict is history: muted value, then which measurement it was
  *  and how old it is — never styled like a live reading. */
 @Composable
@@ -879,7 +870,6 @@ private fun StoredLatency(
     modifier: Modifier = Modifier,
 ) {
     val now = System.currentTimeMillis()
-    val (ageRes, ageValue) = latencyAgeLabel(maxOf(0L, now - stored.checkedAtMs))
     val method =
         stringResource(
             when (stored.method) {
@@ -891,7 +881,7 @@ private fun StoredLatency(
         stringResource(
             if (stored.isFresh(now)) R.string.servers_latency_earlier else R.string.servers_latency_stale,
         )
-    val age = stringResource(ageRes, ageValue)
+    val age = relativeTimeText(maxOf(0L, now - stored.checkedAtMs))
     Text(
         text =
             if (stored.latencyMs != null) {

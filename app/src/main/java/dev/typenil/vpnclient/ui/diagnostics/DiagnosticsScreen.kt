@@ -53,6 +53,7 @@ import dev.typenil.vpnclient.core.vpn.VpnConnectionState
 import dev.typenil.vpnclient.ui.common.CORE_VERSION
 import dev.typenil.vpnclient.ui.common.DetailRow
 import dev.typenil.vpnclient.ui.common.appliedDnsSummary
+import dev.typenil.vpnclient.ui.common.localizedResources
 import dev.typenil.vpnclient.ui.common.perAppSummary
 import dev.typenil.vpnclient.ui.common.routeModeSummary
 import dev.typenil.vpnclient.ui.common.underlayLabel
@@ -193,7 +194,9 @@ fun DiagnosticsScreen(
                 Text(stringResource(R.string.diag_core_log_clear))
             }
             Text(
-                text = stringResource(R.string.diag_export_log_sub, LogRing.DEFAULT_CAPACITY),
+                text = localizedResources().getQuantityString(
+                    R.plurals.diag_export_log_sub, LogRing.DEFAULT_CAPACITY, LogRing.DEFAULT_CAPACITY,
+                ),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 4.dp, bottom = 16.dp),

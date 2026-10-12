@@ -1,6 +1,8 @@
 package dev.typenil.vpnclient.core.vpn
 
+import dev.typenil.vpnclient.core.common.formatRate
 import dev.typenil.vpnclient.core.engine.TrafficStats
+import java.util.Locale
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -20,14 +22,14 @@ class NotificationRateTextTest {
 
     @Test
     fun `null stats produce no rate text`() {
-        assertNull(rateText(null))
+        assertNull(rateText(null) { "x" })
     }
 
     @Test
     fun `rates render as downlink then uplink`() {
         assertEquals(
             "↓ 1.5 KB/s · ↑ 512 B/s",
-            rateText(stats(down = 1536, up = 512)),
+            rateText(stats(down = 1536, up = 512)) { formatRate(it, listOf("B", "KB", "MB", "GB", "TB"), "%1\$s/s", Locale.US) },
         )
     }
 }

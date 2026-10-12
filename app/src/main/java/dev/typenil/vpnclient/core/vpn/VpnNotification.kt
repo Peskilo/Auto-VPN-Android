@@ -9,7 +9,6 @@ import android.content.Intent
 import androidx.core.app.NotificationCompat
 import dev.typenil.vpnclient.MainActivity
 import dev.typenil.vpnclient.R
-import dev.typenil.vpnclient.core.common.formatRate
 import dev.typenil.vpnclient.core.engine.TrafficStats
 
 /** Foreground-service notification for the tunnel. */
@@ -94,6 +93,6 @@ class VpnNotification(private val service: Service) {
  * there are no stats yet so callers can fall back to the node name alone.
  * Rates are real core telemetry — never decorate a state we don't have.
  */
-internal fun rateText(stats: TrafficStats?): String? = stats?.let {
+internal fun rateText(stats: TrafficStats?, formatRate: (Long) -> String): String? = stats?.let {
     "↓ ${formatRate(it.downlinkBytesPerSec)} · ↑ ${formatRate(it.uplinkBytesPerSec)}"
 }

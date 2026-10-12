@@ -41,17 +41,11 @@ fun perAppSummary(
         }
 
         PerAppMode.INCLUDE -> {
-            stringResource(
-                if (count == 1) R.string.home_per_app_include_one else R.string.home_per_app_include,
-                count,
-            )
+            localizedResources().getQuantityString(R.plurals.home_per_app_include, count, count)
         }
 
         PerAppMode.EXCLUDE -> {
-            stringResource(
-                if (count == 1) R.string.home_per_app_exclude_one else R.string.home_per_app_exclude,
-                count,
-            )
+            localizedResources().getQuantityString(R.plurals.home_per_app_exclude, count, count)
         }
     }
 
