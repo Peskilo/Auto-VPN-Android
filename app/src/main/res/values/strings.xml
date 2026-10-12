@@ -86,7 +86,6 @@
     <string name="notification_error">Connection error</string>
     <string name="action_disconnect">Disconnect</string>
 
-    <string name="nav_home">Home</string>
     <string name="nav_servers">Servers</string>
     <string name="nav_subscriptions">Subscriptions</string>
     <string name="nav_settings">Settings</string>
@@ -188,46 +187,20 @@
     <string name="per_app_mode_all">All apps</string>
 
     <!-- Afterglow Home -->
-    <string name="afterglow_activity">Diagnostics and activity</string>
     <string name="afterglow_offline">VPN OFF</string>
     <string name="afterglow_online">VPN active</string>
-    <string name="afterglow_failed">VPN failed</string>
-    <string name="afterglow_relinking">RECONNECTING…</string>
-    <string name="afterglow_preparing">PREPARING…</string>
     <string name="afterglow_permission">VPN PERMISSION</string>
-    <string name="afterglow_connecting">CONNECTING…</string>
-    <string name="afterglow_stopping">DISCONNECTING…</string>
     <string name="afterglow_auto">AUTO</string>
     <string name="afterglow_status_reconnecting">Reconnecting…</string>
     <string name="afterglow_measured_latency">Latency · %1$d ms</string>
     <string name="afterglow_auto_best_latency">Min latency: %1$s (%2$d ms)</string>
-    <string name="afterglow_auto_best_latency_noms">Min latency: %1$s</string>
     <string name="afterglow_your_connection">YOUR CONNECTION</string>
-    <string name="afterglow_home_index">HOME / 01</string>
-    <string name="afterglow_connection_index">CONNECTION</string>
-    <string name="afterglow_network">RUNE / NETWORK</string>
-    <string name="afterglow_tunnel_off">VPN TUNNEL OFF</string>
-    <string name="afterglow_tunnel_active">VPN TUNNEL ACTIVE</string>
     <string name="afterglow_selected_server">SERVER</string>
-    <string name="afterglow_change">CHANGE →</string>
-    <string name="afterglow_selected_node">SELECTED NODE</string>
-    <string name="afterglow_node">NODE</string>
-    <string name="afterglow_routing_value">Routing · %1$s</string>
     <string name="afterglow_pending">CHANGES PENDING</string>
-    <string name="afterglow_session_overview">Session overview</string>
-    <string name="afterglow_connection_details">Connection details</string>
-    <string name="afterglow_live">03 / LIVE</string>
-    <string name="afterglow_configuration">03 / CONFIGURATION</string>
     <string name="afterglow_stats_unavailable">Session telemetry unavailable</string>
     <string name="afterglow_start">Start connection</string>
     <string name="afterglow_retry">Retry connection</string>
-    <string name="afterglow_ready">READY TO CONNECT</string>
-    <string name="afterglow_action_required">ACTION REQUIRED</string>
-    <string name="afterglow_session_progress">SESSION IN PROGRESS</string>
-    <string name="afterglow_please_wait">PLEASE WAIT</string>
     <string name="afterglow_no_servers_headline">No servers</string>
-    <string name="afterglow_latency_not_measured">Latency not measured</string>
-    <string name="afterglow_current_outbound">Current server: %1$s</string>
     <string name="afterglow_no_usable_servers">No usable servers. Check your subscriptions or server filters.</string>
     <string name="afterglow_permission_explanation">Android VPN permission is required to connect. Approve the system request to continue.</string>
     <string name="afterglow_quick_access">QUICK ACCESS</string>
@@ -236,8 +209,6 @@
     <string name="afterglow_statistics">Statistics</string>
     <string name="afterglow_session_elapsed">Uptime · %1$s</string>
     <string name="afterglow_routing_title">Routing</string>
-    <string name="afterglow_session_download">Downloaded this session</string>
-    <string name="afterglow_session_upload">Uploaded this session</string>
     <string name="afterglow_open_diagnostics">View diagnostics</string>
     <string name="afterglow_restart_guard_title">Automatic restart paused</string>
     <!-- Home -->
@@ -261,7 +232,6 @@
     <string name="home_error_engine">VPN core failed: %1$s</string>
     <string name="home_error_tunnel">Tunnel failed: %1$s</string>
     <string name="home_no_server_selected">No server selected</string>
-    <string name="home_tap_to_change">Tap to change</string>
     <string name="home_picker_title">Server</string>
     <string name="home_picker_search">Search servers</string>
     <string name="home_picker_all_servers">All servers, filters &amp; latency</string>
@@ -270,7 +240,6 @@
     <string name="home_stat_download">Download</string>
     <string name="home_stat_upload">Upload</string>
     <string name="home_stat_connections">Connections</string>
-    <string name="home_stat_connections_value">\u2193 %1$d  \u2191 %2$d</string>
     <string name="home_stat_total_suffix">%1$s total</string>
     <string name="home_details_title">Session details</string>
     <string name="home_details_node">Server</string>
@@ -296,7 +265,6 @@
         <item quantity="other">Exclude %1$d apps</item>
     </plurals>
     <string name="home_auto_subtitle">Fastest available server</string>
-    <string name="home_connect">Connect</string>
 
     <!-- Servers -->
     <string name="servers_search_hint">Search name or server</string>
@@ -351,7 +319,6 @@
     <string name="settings_language">Language</string>
     <string name="settings_dynamic_color">Dynamic color</string>
     <string name="settings_dynamic_color_sub">Use wallpaper-based colors (Android 12+)</string>
-    <string name="settings_per_app_sub">Choose which apps use the tunnel</string>
     <string name="about_title">About</string>
     <string name="about_version">App version</string>
     <string name="about_version_value">%1$s (%2$d)</string>
@@ -373,7 +340,6 @@
     <string name="settings_interval_label">Interval override (minutes, min 15)</string>
     <string name="settings_interval_placeholder">provider</string>
     <string name="settings_auto_refresh_default_note">Default policy — a subscription can override it in its details.</string>
-    <string name="settings_route_mode_note">Applies on next connect</string>
     <string name="settings_routing_sub">Mode, per-app VPN, LAN bypass</string>
     <string name="settings_notifications">Notifications</string>
     <string name="settings_notifications_granted">Granted</string>
@@ -407,7 +373,6 @@
 
     <!-- Subscriptions -->
     <string name="subs_empty">No subscriptions yet</string>
-    <string name="subs_add_cd">Add subscription</string>
     <string name="subs_delete_confirm_title">Delete subscription?</string>
     <string name="subs_delete_confirm_text">\"%1$s\" and its servers will be removed.</string>
     <string name="subs_manual_hint">Manual — paste share links to add</string>
