@@ -494,6 +494,7 @@
     <string name="subs_hwid_disabled_refusal">Отправка HWID выключена. Этот провайдер отказал в обновлении без него. Проверьте настройку HWID или обратитесь в поддержку.</string>
     <string name="subs_hwid_ambiguous">Провайдер отклонил идентификацию устройства. Лимит устройств не подтверждён; обратитесь в поддержку.</string>
     <string name="subs_http_error">Подписка не обновлена: сервер вернул HTTP %1$d.</string>
+    <string name="subs_not_added">Подписка не добавлена</string>
     <string name="hwid_send">Отправлять HWID</string>
     <string name="hwid_what">Что такое HWID?</string>
     <string name="hwid_allow">Разрешить</string>

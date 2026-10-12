@@ -480,6 +480,7 @@
     <string name="subs_hwid_disabled_refusal">HWID sending is off. This provider refused the update without it. Review HWID settings or contact support.</string>
     <string name="subs_hwid_ambiguous">Provider rejected device identification. A device limit is not confirmed; contact support.</string>
     <string name="subs_http_error">Subscription not updated: server returned HTTP %1$d.</string>
+    <string name="subs_not_added">Subscription not added</string>
     <string name="hwid_send">Send HWID</string>
     <string name="hwid_what">What is HWID?</string>
     <string name="hwid_allow">Allow</string>

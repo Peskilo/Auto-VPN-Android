@@ -435,18 +435,34 @@ class SubscriptionsViewModelTest {
         }
 
     @Test
-    fun `dismissed Unset explanation neither imports nor saves consent`() =
+    fun `Back on the Unset explanation cancels the add, keeps Unset and says so`() =
         testScope.runTest {
+            collectUi()
             settings.hwidConsent.value = dev.typenil.vpnclient.core.subscription.HwidConsent.Unset
             viewModel.add("http://127.0.0.1/synthetic", null, true)
             advanceUntilIdle()
             assertTrue(viewModel.hwidPrompt.value)
-            viewModel.dismissHwidPrompt()
-            viewModel.chooseHwidConsent(true)
+            viewModel.cancelHwidPrompt()
             advanceUntilIdle()
             assertFalse(viewModel.hwidPrompt.value)
             assertEquals(dev.typenil.vpnclient.core.subscription.HwidConsent.Unset, settings.hwidConsent.value)
             assertTrue(subscriptionDao.subs.isEmpty())
+            val message = viewModel.uiState.value.pendingMessage?.body as dev.typenil.vpnclient.ui.common.UserMessage.Resource
+            assertEquals(dev.typenil.vpnclient.R.string.subs_not_added, message.resId)
+            // A late button press after cancel must not resurrect the add.
+            viewModel.chooseHwidConsent(true)
+            advanceUntilIdle()
+            assertEquals(dev.typenil.vpnclient.core.subscription.HwidConsent.Unset, settings.hwidConsent.value)
+            assertTrue(subscriptionDao.subs.isEmpty())
+        }
+
+    @Test
+    fun `cancel without a pending prompt posts nothing`() =
+        testScope.runTest {
+            collectUi()
+            viewModel.cancelHwidPrompt()
+            advanceUntilIdle()
+            assertNull(viewModel.uiState.value.pendingMessage)
         }
 
     @Test

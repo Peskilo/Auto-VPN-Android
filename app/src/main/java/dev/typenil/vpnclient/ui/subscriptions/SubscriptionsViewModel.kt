@@ -167,9 +167,17 @@ class SubscriptionsViewModel
         private val _hwidPrompt = MutableStateFlow(false)
         val hwidPrompt: StateFlow<Boolean> = _hwidPrompt
 
-        fun dismissHwidPrompt() {
+        private fun dismissHwidPrompt() {
             pendingImport = null
             _hwidPrompt.value = false
+        }
+
+        /** Back / tap outside the consent dialog: the add is cancelled, no consent is
+         *  written (stays Unset), and the user is told nothing was added. */
+        fun cancelHwidPrompt() {
+            if (pendingImport == null && !_hwidPrompt.value) return
+            dismissHwidPrompt()
+            postMessage(R.string.subs_not_added, "Subscription not added")
         }
 
         fun chooseHwidConsent(allowed: Boolean) {

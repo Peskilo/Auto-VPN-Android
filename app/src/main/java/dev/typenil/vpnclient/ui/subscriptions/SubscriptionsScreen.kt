@@ -256,7 +256,7 @@ fun SubscriptionsScreen(
 
     if (hwidPrompt) {
         AlertDialog(
-            onDismissRequest = viewModel::dismissHwidPrompt,
+            onDismissRequest = viewModel::cancelHwidPrompt,
             title = { Text(stringResource(R.string.hwid_what)) },
             text = { Text(stringResource(R.string.hwid_explanation)) },
             confirmButton = {
