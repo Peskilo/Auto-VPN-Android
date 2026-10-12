@@ -132,7 +132,7 @@ internal fun AfterglowHomeContent(
             // its entire measured height is reserved below the scroll content.
             .windowInsetsPadding(WindowInsets.navigationBars.only(WindowInsetsSides.Horizontal))
             .padding(bottom = actionReserve)) {
-            Row(Modifier.fillMaxWidth().heightIn(min = 58.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.fillMaxWidth().heightIn(min = if (isShortWindow(LocalConfiguration.current.screenHeightDp)) 48.dp else 58.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text("RUNE", fontSize = 31.sp, fontWeight = FontWeight.Black, letterSpacing = (-2).sp, color = colors.ink)
                 Text(".", fontSize = 31.sp, fontWeight = FontWeight.Black, color = colors.coral)
                 Spacer(Modifier.weight(1f))
@@ -250,7 +250,7 @@ private fun ConnectionHero(state: VisualState, noServers: Boolean, delayMs: Int?
     val fontScale = LocalDensity.current.fontScale
     val largeFont = fontScale > 1.3f
     // Landscape keeps a working viewport — compact hero, same type sizes.
-    val heroMin = if (LocalConfiguration.current.screenHeightDp <= 420) 128f else 164f
+    val heroMin = if (isShortWindow(LocalConfiguration.current.screenHeightDp)) 128f else 164f
     Box(Modifier.fillMaxWidth().heightIn(min = if (largeFont) (heroMin + (fontScale - 1.3f) * 85f).dp else heroMin.dp)
         .semantics { stateDescription = headline }
         .clip(AfterglowTokens.cardShape).background(Brush.horizontalGradient(listOf(base, base, colors.actionSurface)))) {
@@ -346,7 +346,8 @@ private fun ConnectionAction(state: VisualState, noServers: Boolean, onConnect: 
     }
     // Decorative mascot earns its pad only on tall-enough screens; on
     // landscape/short heights it leaves so the CTA keeps usable viewport.
-    val showMascot = LocalConfiguration.current.screenHeightDp > 420
+    val shortWindow = isShortWindow(LocalConfiguration.current.screenHeightDp)
+    val showMascot = !shortWindow
     Box(modifier.fillMaxWidth().padding(top = if (showMascot) 64.dp else 0.dp)
         .graphicsLayer { scaleX = pressScale; scaleY = pressScale }) {
         Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
@@ -355,9 +356,9 @@ private fun ConnectionAction(state: VisualState, noServers: Boolean, onConnect: 
             .semantics { role = Role.Button }
             .clickable(enabled = enabled, interactionSource = interaction, indication = null,
                 onClick = if ((active || cancellable) && !noServers) onDisconnect else onConnect)
-            .heightIn(min = 84.dp).padding(start = 12.dp, end = 12.dp, top = 12.dp, bottom = 12.dp),
+            .heightIn(min = if (shortWindow) 64.dp else 84.dp).padding(12.dp),
             verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(52.dp).clip(RoundedCornerShape(8.dp)).background(animatedAccent),
+            Box(Modifier.size(if (shortWindow) 44.dp else 52.dp).clip(RoundedCornerShape(8.dp)).background(animatedAccent),
                 contentAlignment = Alignment.Center) {
                 if (noServers) Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null,
                     tint = colors.actionSurface, modifier = Modifier.size(26.dp))
@@ -587,9 +588,9 @@ private fun ServerAndRouting(ui: HomeUiState, onPick: () -> Unit, onAdd: () -> U
 private fun SessionStats(
     state: VpnConnectionState.Connected,
     onOpenConnections: () -> Unit,
+    onOpenDetails: () -> Unit,
     expanded: Boolean,
     onToggle: () -> Unit,
-    onOpenDetails: () -> Unit,
 ) {
     val colors = AfterglowTheme.colors
     val history = remember(state.since) { TrafficHistory() }
@@ -634,6 +635,7 @@ private fun SessionStats(
             // One compact state instead of two empty metric columns plus a
             // trailing explanation — same information, less noise.
             Text(stringResource(R.string.afterglow_stats_unavailable), color = colors.muted,
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp))
         } else if (!expanded) {
             // Collapsed: the two live rates only (session time sits in the header);
             // charts, totals and technical rows stay behind "Details".
@@ -659,7 +661,6 @@ private fun SessionStats(
                 SpeedMetric(stringResource(R.string.home_stat_upload), s.uplinkBytesPerSec,
                     s.uplinkTotalBytes, chartSamples, displayNanos, false, colors.coral, Modifier.weight(1f))
             }
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp))
         }
         if (expanded) {
             Box(Modifier.fillMaxWidth().height(1.dp).background(colors.border))
@@ -688,8 +689,8 @@ private fun SessionStats(
                 CircledChevron()
             }
         }
-        // Explicit toggle: the label names the action, the chevron shows direction.
         Box(Modifier.fillMaxWidth().height(1.dp).background(colors.border))
+        // Explicit toggle: the label names the action, the chevron shows direction.
         Row(Modifier.fillMaxWidth().semantics { role = Role.Button }
             .clickable(onClick = onToggle).heightIn(min = 48.dp)
             .padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
