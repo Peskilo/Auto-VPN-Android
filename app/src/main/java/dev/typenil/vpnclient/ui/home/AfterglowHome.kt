@@ -280,7 +280,11 @@ private fun ConnectionHero(
     val heroMin = if (isShortWindow(LocalConfiguration.current.screenHeightDp)) 128f else 164f
     val heroMinEff = if (largeFont) heroMin + (fontScale - 1.3f) * 85f else heroMin
     val artScale = heroArtScale(fontScale)
-    Box(Modifier.fillMaxWidth().heightIn(min = heroMinEff.dp)
+    // The art is as tall as the hero, which grows with wrapped text at large fonts — the hint cap
+    // follows the measured height (taller hero -> narrower cap -> at most more lines, bounded by the 40% floor, so it settles).
+    var heroHeightPx by remember { mutableIntStateOf(0) }
+    val heroHeightDp = maxOf(heroMinEff, with(LocalDensity.current) { heroHeightPx.toDp().value })
+    Box(Modifier.fillMaxWidth().heightIn(min = heroMinEff.dp).onSizeChanged { heroHeightPx = it.height }
         .clip(AfterglowTokens.cardShape).background(Brush.horizontalGradient(listOf(base, base, colors.actionSurface)))) {
         Spacer(Modifier.fillMaxWidth().height(heroMin.dp))
         // Decorative artwork never participates in the hero's measurement.
@@ -304,7 +308,7 @@ private fun ConnectionHero(
         // Width is measured so the hint lines can stop short of the mascot face
         // (it hangs off the bottom-right) instead of sliding under it.
         BoxWithConstraints(Modifier.align(Alignment.CenterStart)) {
-            val hintCap = heroHintMaxWidthDp(maxWidth.value, heroMinEff, artScale).dp
+            val hintCap = heroHintMaxWidthDp(maxWidth.value, heroHeightDp, artScale).dp
             Column(Modifier.fillMaxWidth(if (largeFont) .82f else .72f)
                 .padding(start = 18.dp, end = 8.dp, top = 20.dp, bottom = 20.dp)) {
                 Text(stringResource(R.string.afterglow_your_connection),
