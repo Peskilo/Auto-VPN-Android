@@ -453,6 +453,101 @@ class ConnectionManagerTest {
 
     private fun dnsLevel() = manager.health.value.observations.first { it.level == HealthLevel.DnsReachable }
 
+    private fun trafficLevel() = manager.health.value.observations.first { it.level == HealthLevel.TrafficForwarding }
+
+    @Test fun `on-demand check is a no-op unless Connected`() = testScope.runTest {
+        manager.requestHealthCheck()
+        runCurrent()
+        assertEquals(0, probeCalls)
+        assertEquals(0, dnsCalls)
+        manager.connect()
+        advanceUntilIdle()
+        assertTrue(manager.state.value is VpnConnectionState.Connecting)
+        manager.requestHealthCheck()
+        runCurrent()
+        assertEquals(0, probeCalls)
+    }
+
+    @Test fun `on-demand check writes only health and never touches the session`() = testScope.runTest {
+        readyForProbe()
+        probeCheck = { IpCheckResult(null, null, "http 503") }
+        dnsCheck = { DnsCheckResult.Failed }
+        manager.requestHealthCheck()
+        runCurrent()
+        assertEquals(2, probeCalls)
+        assertEquals(2, dnsCalls)
+        assertEquals(HealthStatus.Degraded, trafficLevel().status)
+        assertEquals(HealthReason.HttpError, trafficLevel().reason)
+        assertEquals(HealthStatus.Degraded, dnsLevel().status)
+        assertTrue(manager.state.value is VpnConnectionState.Connected)
+        assertEquals(1, serviceControl.connectStarts)
+        assertEquals(0, serviceControl.disconnectStarts)
+    }
+
+    @Test fun `on-demand check is single-flight and yields to an auto check`() = testScope.runTest {
+        val gate = CompletableDeferred<Unit>()
+        probeCheck = { gate.await(); IpCheckResult("192.0.2.1", 1, null) }
+        readyForProbe() // the post-start check is still waiting on the gate
+        assertEquals(1, probeCalls)
+        manager.requestHealthCheck()
+        runCurrent()
+        assertEquals(1, probeCalls)
+        gate.complete(Unit)
+        runCurrent()
+        val second = CompletableDeferred<Unit>()
+        probeCheck = { second.await(); IpCheckResult("192.0.2.1", 1, null) }
+        manager.requestHealthCheck()
+        manager.requestHealthCheck()
+        manager.requestHealthCheck()
+        runCurrent()
+        assertEquals(2, probeCalls)
+        assertEquals(2, dnsCalls)
+        second.complete(Unit)
+        runCurrent()
+        manager.requestHealthCheck()
+        runCurrent()
+        assertEquals(3, probeCalls)
+    }
+
+    @Test fun `on-demand check does not consume or delay the path retry`() = testScope.runTest {
+        val generation = readyForProbe()
+        repeat(3) { manager.requestHealthCheck(); runCurrent() }
+        assertEquals(1 + 3, probeCalls)
+        // Path retry still fires after its own 3s debounce: no shared cooldown or budget.
+        pathChanged(generation)
+        advanceTimeBy(3_000); runCurrent()
+        assertEquals(2 + 3, probeCalls)
+        // And a spent path-retry budget does not stop the on-demand check.
+        repeat(ConnectionManager.MAX_PATH_RETRIES) { pathChanged(generation); advanceTimeBy(60_000); runCurrent() }
+        val before = probeCalls
+        manager.requestHealthCheck(); runCurrent()
+        assertEquals(before + 1, probeCalls)
+    }
+
+    @Test fun `leaving Connected cancels an on-demand check and its late result is dropped`() = testScope.runTest {
+        val generation = readyForProbe()
+        val gate = CompletableDeferred<Unit>()
+        var cancelled = 0
+        probeCheck = {
+            try { gate.await(); IpCheckResult("192.0.2.1", 1, null) }
+            catch (e: kotlinx.coroutines.CancellationException) { cancelled++; throw e }
+        }
+        manager.requestHealthCheck()
+        runCurrent()
+        assertEquals(2, probeCalls)
+        manager.onUnderlyingNetworkLost(generation)
+        runCurrent()
+        assertTrue(manager.state.value is VpnConnectionState.Reconnecting)
+        assertEquals(1, cancelled)
+        gate.complete(Unit)
+        runCurrent()
+        assertEquals(HealthStatus.Unverified, trafficLevel().status)
+        // Not Connected any more: a new request is a no-op.
+        manager.requestHealthCheck()
+        runCurrent()
+        assertEquals(2, probeCalls)
+    }
+
     private fun pathChanged(generation: Long) {
         manager.reportHealthUnderlay(true, generation, pathChanged = true)
         testScope.runCurrent()

@@ -190,6 +190,24 @@ class ConnectionManager
         val health: StateFlow<ConnectionHealth> = healthStore.state
         fun healthSnapshot(): ConnectionHealth? = healthStore.snapshot()
 
+        private var demandJob: Job? = null
+
+        /**
+         * On-demand probe for a visible Home. Connected only, single-flight, health
+         * writes only (token-gated). Deliberately separate from the post-start/path-retry
+         * machinery: it never touches pathRetries, retryCooldown, the path revision or
+         * postStartTokens, and yields to an auto check that is already in flight.
+         */
+        fun requestHealthCheck() {
+            if (_state.value !is VpnConnectionState.Connected || teardownRequested || engine == null) return
+            if (demandJob?.isActive == true || postStartJob?.isActive == true || pathRetryJob?.isActive == true) return
+            val generation = sessionGeneration
+            demandJob = scope.launch {
+                val tokens = issueProbeTokens() ?: return@launch
+                runHealthProbes(generation, tokens)
+            }
+        }
+
         private fun recordConsent(status: HealthStatus, reason: HealthReason) {
             healthStore.record(sessionGeneration, HealthLevel.VpnConsent, status, reason, HealthSource.VpnConsent, HealthScope.LocalRuntime)
         }
@@ -208,6 +226,7 @@ class ConnectionManager
                 delay(PATH_STABLE_MS)
                 retryCooldown?.join()
                 postStartJob?.cancelAndJoin() // include both probes' cancellation cleanup
+                demandJob?.cancelAndJoin() // never two parallel probe requests
                 if (generation != sessionGeneration || _state.value !is VpnConnectionState.Connected ||
                     teardownRequested || pathRetries >= MAX_PATH_RETRIES
                 ) return@launch
@@ -244,78 +263,89 @@ class ConnectionManager
                     retryCooldown = scope.launch { delay(PATH_RETRY_INTERVAL_MS) }
                     SecureLog.d(TAG, "post-start path check Restarted")
                 }
-                val trafficToken = healthStore.token(HealthLevel.TrafficForwarding) ?: return@launch
-                val successToken = healthStore.token(HealthLevel.LastSuccessfulCheck) ?: return@launch
-                val dnsToken = healthStore.token(HealthLevel.DnsReachable) ?: return@launch
-                postStartTokens = listOf(trafficToken, successToken, dnsToken)
+                val tokens = issueProbeTokens() ?: return@launch
+                postStartTokens = tokens
                 preparingPathRetry = false
-                // Independent of A-01: own level/token, health writes only — a DNS
-                // failure is Degraded evidence, never a state change or reconnect.
-                launch {
-                    val dnsChecked = System.nanoTime() / 1_000_000
-                    val dns = try {
-                        withTimeoutOrNull(DnsProbe.DEFAULT_TIMEOUT_MS) { postStartProbe.checkDns() } ?: DnsCheckResult.Timeout
-                    } catch (e: CancellationException) {
-                        throw e
-                    } catch (e: Exception) {
-                        SecureLog.w(TAG, "post-start dns check threw")
-                        DnsCheckResult.NotRun
-                    }
-                    SecureLog.d(TAG, "post-start dns check ${dns.name}") // enum name only
-                    // No re-check of session state here: every non-Connected publish and
-                    // path/runtime change invalidates the token, and observe() rejects
-                    // stale tokens and generation mismatches (same as A-01).
-                    val (status, dnsReason) = when (dns) {
-                        DnsCheckResult.Answered -> HealthStatus.Ok to HealthReason.DnsAnswered
-                        DnsCheckResult.Timeout -> HealthStatus.Degraded to HealthReason.DnsTimeout
-                        DnsCheckResult.Failed -> HealthStatus.Degraded to HealthReason.DnsFailed
-                        DnsCheckResult.NotRun -> return@launch // not verified, so not written
-                    }
-                    healthStore.observe(
-                        HealthObservation(HealthLevel.DnsReachable, status, dnsReason, HealthSource.DnsQuery,
-                            HealthScope.AppDnsQuery, generation, dnsChecked, Instant.now()),
-                        dnsToken,
-                    )
-                }
-                val checked = System.nanoTime() / 1_000_000
-                val result = try {
-                    withTimeoutOrNull(IpProbe.DEFAULT_TIMEOUT_MS) { postStartProbe.check() }
-                        ?: IpCheckResult(null, null, "timeout")
-                } catch (e: CancellationException) {
-                    // Session teardown/network loss cancelled the job — not a check result.
-                    throw e
-                } catch (e: Exception) {
-                    // A throwing probe is degraded evidence, never a session
-                    // failure. The exception itself stays unlogged — it can
-                    // embed endpoint details.
-                    SecureLog.w(TAG, "post-start check threw")
-                    IpCheckResult(null, null, "network")
-                }
-                val reason = when {
-                    result.ok -> HealthReason.HttpResponseRouteUnverified
-                    result.error == "timeout" -> HealthReason.HttpTimeout
-                    result.error?.startsWith("http ") == true -> HealthReason.HttpError
-                    result.error == "unexpected response" -> HealthReason.HttpUnexpectedResponse
-                    else -> HealthReason.HttpNetworkError
-                }
-                SecureLog.d(TAG, "post-start ip check ${reason.name}") // outcome only, never the address
-                val displayTime = Instant.now()
-                healthStore.observe(
-                    HealthObservation(HealthLevel.TrafficForwarding,
-                        if (result.ok) HealthStatus.Unverified else HealthStatus.Degraded,
-                        reason, HealthSource.IpEcho, HealthScope.AppHttpRouteUnverified,
-                        generation, checked, displayTime),
-                    trafficToken,
-                )
-                if (result.ok) {
-                    healthStore.observe(
-                        HealthObservation(HealthLevel.LastSuccessfulCheck, HealthStatus.Ok,
-                            reason, HealthSource.IpEcho, HealthScope.AppHttpRouteUnverified,
-                            generation, checked, displayTime),
-                        successToken,
-                    )
-                }
+                runHealthProbes(generation, tokens)
             }
+        }
+
+        /** Captures the current traffic/success/dns tokens. A token is a read-only
+         *  (generation, level, revision) snapshot — it never clears observations. */
+        private fun issueProbeTokens(): List<HealthEvidenceToken>? =
+            listOf(HealthLevel.TrafficForwarding, HealthLevel.LastSuccessfulCheck, HealthLevel.DnsReachable)
+                .mapNotNull { healthStore.token(it) }.takeIf { it.size == 3 }
+
+        /** DNS + HTTP probes, health writes only (token-gated). Shared by the post-start
+         *  check and [requestHealthCheck]; touches no retry bookkeeping. */
+        private suspend fun CoroutineScope.runHealthProbes(generation: Long, tokens: List<HealthEvidenceToken>) {
+            val (trafficToken, successToken, dnsToken) = tokens
+            // Independent of A-01: own level/token, health writes only — a DNS
+            // failure is Degraded evidence, never a state change or reconnect.
+        launch {
+            val dnsChecked = System.nanoTime() / 1_000_000
+            val dns = try {
+                withTimeoutOrNull(DnsProbe.DEFAULT_TIMEOUT_MS) { postStartProbe.checkDns() } ?: DnsCheckResult.Timeout
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                SecureLog.w(TAG, "post-start dns check threw")
+                DnsCheckResult.NotRun
+            }
+            SecureLog.d(TAG, "post-start dns check ${dns.name}") // enum name only
+            // No re-check of session state here: every non-Connected publish and
+            // path/runtime change invalidates the token, and observe() rejects
+            // stale tokens and generation mismatches (same as A-01).
+            val (status, dnsReason) = when (dns) {
+                DnsCheckResult.Answered -> HealthStatus.Ok to HealthReason.DnsAnswered
+                DnsCheckResult.Timeout -> HealthStatus.Degraded to HealthReason.DnsTimeout
+                DnsCheckResult.Failed -> HealthStatus.Degraded to HealthReason.DnsFailed
+                DnsCheckResult.NotRun -> return@launch // not verified, so not written
+            }
+            healthStore.observe(
+                HealthObservation(HealthLevel.DnsReachable, status, dnsReason, HealthSource.DnsQuery,
+                    HealthScope.AppDnsQuery, generation, dnsChecked, Instant.now()),
+                dnsToken,
+            )
+        }
+        val checked = System.nanoTime() / 1_000_000
+        val result = try {
+            withTimeoutOrNull(IpProbe.DEFAULT_TIMEOUT_MS) { postStartProbe.check() }
+                ?: IpCheckResult(null, null, "timeout")
+        } catch (e: CancellationException) {
+            // Session teardown/network loss cancelled the job — not a check result.
+            throw e
+        } catch (e: Exception) {
+            // A throwing probe is degraded evidence, never a session
+            // failure. The exception itself stays unlogged — it can
+            // embed endpoint details.
+            SecureLog.w(TAG, "post-start check threw")
+            IpCheckResult(null, null, "network")
+        }
+        val reason = when {
+            result.ok -> HealthReason.HttpResponseRouteUnverified
+            result.error == "timeout" -> HealthReason.HttpTimeout
+            result.error?.startsWith("http ") == true -> HealthReason.HttpError
+            result.error == "unexpected response" -> HealthReason.HttpUnexpectedResponse
+            else -> HealthReason.HttpNetworkError
+        }
+        SecureLog.d(TAG, "post-start ip check ${reason.name}") // outcome only, never the address
+        val displayTime = Instant.now()
+        healthStore.observe(
+            HealthObservation(HealthLevel.TrafficForwarding,
+                if (result.ok) HealthStatus.Unverified else HealthStatus.Degraded,
+                reason, HealthSource.IpEcho, HealthScope.AppHttpRouteUnverified,
+                generation, checked, displayTime),
+            trafficToken,
+        )
+        if (result.ok) {
+            healthStore.observe(
+                HealthObservation(HealthLevel.LastSuccessfulCheck, HealthStatus.Ok,
+                    reason, HealthSource.IpEcho, HealthScope.AppHttpRouteUnverified,
+                    generation, checked, displayTime),
+                successToken,
+            )
+        }
         }
 
         /** Consent intent the UI must launch. */
@@ -1535,6 +1565,7 @@ class ConnectionManager
             if (next !is VpnConnectionState.Connected) {
                 pathRetryJob?.cancel()
                 postStartJob?.cancel()
+                demandJob?.cancel()
             }
             val acceptedHealthGeneration = if (healthGeneration < 0) sessionGeneration else healthGeneration
             when (next) {
