@@ -161,6 +161,28 @@ class HomeViewModel
             batteryHint.dismiss()
         }
 
+        private val healthCheckPolicy = HealthCheckPolicy(::monotonicMs)
+        private var healthCheckJob: kotlinx.coroutines.Job? = null
+
+        private fun monotonicMs() = System.nanoTime() / 1_000_000
+
+        /** Home entered STARTED: on-demand probes may run. Idempotent. */
+        fun onHomeStarted() {
+            if (healthCheckJob?.isActive == true) return
+            healthCheckJob = viewModelScope.launch {
+                runHealthChecks(connectionManager.state, connectionManager.health, healthCheckPolicy, ::monotonicMs) {
+                    connectionManager.requestHealthCheck()
+                }
+            }
+        }
+
+        /** Home left STARTED (other screen, background, screen off): nothing keeps probing. */
+        fun onHomeStopped() {
+            healthCheckJob?.cancel()
+            healthCheckJob = null
+            healthCheckPolicy.reset()
+        }
+
         init {
             viewModelScope.launch {
                 connectionManager.state.collect { state ->

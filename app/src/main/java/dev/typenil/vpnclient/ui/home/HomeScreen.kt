@@ -101,6 +101,19 @@ fun HomeScreen(
         batteryLifecycle.lifecycle.addObserver(observer)
         onDispose { batteryLifecycle.lifecycle.removeObserver(observer) }
     }
+    // On-demand health probes only while Home is visible (STARTED); the observer
+    // replays ON_START if already started and stops everything on ON_STOP/dispose.
+    androidx.compose.runtime.DisposableEffect(batteryLifecycle, viewModel) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_START) viewModel.onHomeStarted()
+            if (event == Lifecycle.Event.ON_STOP) viewModel.onHomeStopped()
+        }
+        batteryLifecycle.lifecycle.addObserver(observer)
+        onDispose {
+            batteryLifecycle.lifecycle.removeObserver(observer)
+            viewModel.onHomeStopped()
+        }
+    }
 
     var showPicker by remember { mutableStateOf(false) }
     var showDetails by remember { mutableStateOf(false) }
