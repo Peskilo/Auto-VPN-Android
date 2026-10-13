@@ -450,6 +450,11 @@ class SubscriptionsViewModelTest {
                         settings.hwidConsent.value,
                     )
                     assertEquals(allowed, server.takeRequest(5, java.util.concurrent.TimeUnit.SECONDS)!!.getHeader("x-hwid") != null)
+                    // The first add must finish before the next one is accepted.
+                    while (viewModel.addStatus.value == AddStatus.Working && System.currentTimeMillis() < deadline) {
+                        advanceUntilIdle()
+                        Thread.sleep(20)
+                    }
                     server.enqueue(MockResponse().setResponseCode(404))
                     viewModel.add(server.url("/again").toString(), null, true)
                     while (server.requestCount < before + 2 && System.currentTimeMillis() < deadline) {
@@ -458,10 +463,60 @@ class SubscriptionsViewModelTest {
                     }
                     assertFalse(viewModel.hwidPrompt.value)
                     assertEquals(allowed, server.takeRequest(5, java.util.concurrent.TimeUnit.SECONDS)!!.getHeader("x-hwid") != null)
+                    while (viewModel.addStatus.value == AddStatus.Working && System.currentTimeMillis() < deadline) {
+                        advanceUntilIdle()
+                        Thread.sleep(20)
+                    }
                 }
             } finally {
                 server.shutdown()
             }
+        }
+
+    @Test
+    fun `consent path keeps Working so a second add is ignored`() =
+        testScope.runTest {
+            collectUi()
+            val server = MockWebServer()
+            try {
+                server.start()
+                settings.hwidConsent.value = dev.typenil.vpnclient.core.subscription.HwidConsent.Unset
+                val url = server.url("/synthetic").toString()
+                viewModel.add(url, null, true)
+                advanceUntilIdle()
+                assertTrue(viewModel.hwidPrompt.value)
+                assertEquals(AddStatus.Idle, viewModel.addStatus.value)
+
+                server.enqueue(MockResponse().setResponseCode(404).setHeadersDelay(500, java.util.concurrent.TimeUnit.MILLISECONDS))
+                viewModel.chooseHwidConsent(true)
+                // Synchronously Working: the dialog's Add is disabled from this instant.
+                assertEquals(AddStatus.Working, viewModel.addStatus.value)
+                viewModel.chooseHwidConsent(true)
+                viewModel.add(url, null, true)
+                assertEquals(AddStatus.Working, viewModel.addStatus.value)
+
+                val deadline = System.currentTimeMillis() + 5_000
+                while (viewModel.addStatus.value == AddStatus.Working && System.currentTimeMillis() < deadline) {
+                    advanceUntilIdle()
+                    Thread.sleep(20)
+                }
+                assertTrue(viewModel.addStatus.value is AddStatus.Failed)
+                assertEquals(1, server.requestCount)
+            } finally {
+                server.shutdown()
+            }
+        }
+
+    @Test
+    fun `cancelling the consent dialog returns the add dialog to Idle`() =
+        testScope.runTest {
+            collectUi()
+            settings.hwidConsent.value = dev.typenil.vpnclient.core.subscription.HwidConsent.Unset
+            viewModel.add("http://127.0.0.1/synthetic", null, true)
+            advanceUntilIdle()
+            viewModel.cancelHwidPrompt()
+            advanceUntilIdle()
+            assertEquals(AddStatus.Idle, viewModel.addStatus.value)
         }
 
     @Test

@@ -203,6 +203,10 @@ class SubscriptionsViewModel
         }
 
         fun chooseHwidConsent(allowed: Boolean) {
+            // Working is set before the coroutine starts so a second tap on the
+            // dialog's Add (or on a consent button) can't start a second add.
+            if (pendingImport == null || _addStatus.value == AddStatus.Working) return
+            _addStatus.value = AddStatus.Working
             addJob = viewModelScope.launch {
                 val pending = pendingImport ?: return@launch
                 dismissHwidPrompt()
