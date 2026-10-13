@@ -278,7 +278,9 @@ private fun ConnectionHero(
     val largeFont = fontScale > 1.3f
     // Landscape keeps a working viewport — compact hero, same type sizes.
     val heroMin = if (isShortWindow(LocalConfiguration.current.screenHeightDp)) 128f else 164f
-    Box(Modifier.fillMaxWidth().heightIn(min = if (largeFont) (heroMin + (fontScale - 1.3f) * 85f).dp else heroMin.dp)
+    val heroMinEff = if (largeFont) heroMin + (fontScale - 1.3f) * 85f else heroMin
+    val artScale = heroArtScale(fontScale)
+    Box(Modifier.fillMaxWidth().heightIn(min = heroMinEff.dp)
         .clip(AfterglowTokens.cardShape).background(Brush.horizontalGradient(listOf(base, base, colors.actionSurface)))) {
         Spacer(Modifier.fillMaxWidth().height(heroMin.dp))
         // Decorative artwork never participates in the hero's measurement.
@@ -287,7 +289,7 @@ private fun ConnectionHero(
                 contentScale = ContentScale.Crop,
                 // Large fonts widen the headline — the art shrinks (bottom-right) instead of
                 // sitting under the text; unchanged at fontScale <= 1.3.
-                modifier = Modifier.fillMaxHeight(heroArtScale(fontScale)).aspectRatio(1f)
+                modifier = Modifier.fillMaxHeight(artScale).aspectRatio(1f)
                     .align(Alignment.BottomEnd).offset(x = 18.dp)
                     .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
                     .drawWithContent {
@@ -299,30 +301,36 @@ private fun ConnectionHero(
         }
         Box(Modifier.fillMaxSize().background(Brush.horizontalGradient(
             0f to base, .3f to base.copy(alpha = .92f), .7f to Color.Transparent)))
-        Column(Modifier.align(Alignment.CenterStart).fillMaxWidth(if (largeFont) .82f else .72f)
-            .padding(start = 18.dp, end = 8.dp, top = 20.dp, bottom = 20.dp)) {
-            Text(stringResource(R.string.afterglow_your_connection),
-                color = stateColors.onHeroMuted, fontSize = 10.sp,
-                fontWeight = FontWeight.Bold, letterSpacing = .8.sp,
-                modifier = Modifier.padding(bottom = 8.dp))
-            // Only the state headline announces changes — never the latency/stats.
-            // The hint is read as part of the title (one Polite announcement, only when the hint
-            // changes); its own node is hidden so it is not spoken twice.
-            val hintText = hint.textRes()?.let { stringResource(it) }
-            Text(headline, color = stateColors.onHero, fontWeight = FontWeight.Bold,
-                fontSize = 28.sp, lineHeight = 33.sp,
-                modifier = Modifier.semantics {
-                    liveRegion = LiveRegionMode.Polite
-                    if (hintText != null) contentDescription = "$headline. $hintText"
-                })
-            if (hintText != null) {
-                Text(hintText, color = stateColors.onHero, fontSize = 12.sp, fontWeight = FontWeight.Medium,
-                    modifier = Modifier.padding(top = 6.dp).clearAndSetSemantics {})
-            }
-            HeroLatency(delayMs, stateColors.onHero, Modifier.padding(top = 8.dp))
-            if (connected && staleMinutes != null && (delayMs == null || delayMs <= 0)) {
-                Text(stringResource(R.string.home_latency_outdated, staleMinutes),
-                    color = stateColors.onHeroMuted, fontSize = 11.sp, modifier = Modifier.padding(top = 8.dp))
+        // Width is measured so the hint lines can stop short of the mascot face
+        // (it hangs off the bottom-right) instead of sliding under it.
+        BoxWithConstraints(Modifier.align(Alignment.CenterStart)) {
+            val hintCap = heroHintMaxWidthDp(maxWidth.value, heroMinEff, artScale).dp
+            Column(Modifier.fillMaxWidth(if (largeFont) .82f else .72f)
+                .padding(start = 18.dp, end = 8.dp, top = 20.dp, bottom = 20.dp)) {
+                Text(stringResource(R.string.afterglow_your_connection),
+                    color = stateColors.onHeroMuted, fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold, letterSpacing = .8.sp,
+                    modifier = Modifier.padding(bottom = 8.dp))
+                // Only the state headline announces changes — never the latency/stats.
+                // The hint is read as part of the title (one Polite announcement, only when the hint
+                // changes); its own node is hidden so it is not spoken twice.
+                val hintText = hint.textRes()?.let { stringResource(it) }
+                Text(headline, color = stateColors.onHero, fontWeight = FontWeight.Bold,
+                    fontSize = 28.sp, lineHeight = 33.sp,
+                    modifier = Modifier.semantics {
+                        liveRegion = LiveRegionMode.Polite
+                        if (hintText != null) contentDescription = "$headline. $hintText"
+                    })
+                if (hintText != null) {
+                    Text(hintText, color = stateColors.onHero, fontSize = 12.sp, fontWeight = FontWeight.Medium,
+                        modifier = Modifier.padding(top = 6.dp).widthIn(max = hintCap).clearAndSetSemantics {})
+                }
+                HeroLatency(delayMs, stateColors.onHero, Modifier.padding(top = 8.dp))
+                if (connected && staleMinutes != null && (delayMs == null || delayMs <= 0)) {
+                    Text(stringResource(R.string.home_latency_outdated, staleMinutes),
+                        color = stateColors.onHeroMuted, fontSize = 11.sp,
+                        modifier = Modifier.padding(top = 8.dp).widthIn(max = hintCap))
+                }
             }
         }
         Box(Modifier.fillMaxWidth().height(3.dp).align(Alignment.BottomCenter)

@@ -123,3 +123,9 @@ private fun DegradedLargeFontRuPreview() {
         PreviewHome(VpnConnectionState.Connected(exampleNode, Instant.EPOCH, null), hint = HomeHealthHint.Degraded)
     }
 }
+
+@Preview(name = "Connected unreachable en", locale = "en", showBackground = true, widthDp = 390, heightDp = 844)
+@Composable
+private fun UnreachableLightPreview() =
+    PreviewHome(VpnConnectionState.Connected(exampleNode, Instant.EPOCH, null),
+        hint = HomeHealthHint.Unreachable, staleMinutes = 9)
