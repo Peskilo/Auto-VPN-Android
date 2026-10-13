@@ -222,11 +222,19 @@ class SubscriptionRepository
         /**
          * Ids for the refresh-on-launch pass. Prunes abandoned adds FIRST and only then
          * reads the rows, so a leftover from an interrupted add can never be fetched —
-         * the order is the contract, not an accident of two coroutines racing.
+         * the order is the contract, not an accident of two coroutines racing. A prune failure
+         * is logged and the pass continues with whatever rows exist.
          */
         suspend fun launchRefreshCandidates(): List<Long> {
-            val removed = pruneAbandonedAdds()
-            if (removed > 0) SecureLog.i(TAG, "pruned $removed abandoned subscription row(s)")
+            // A failed prune must not cost the user their update-always refresh: log and go on.
+            try {
+                val removed = pruneAbandonedAdds()
+                if (removed > 0) SecureLog.i(TAG, "pruned $removed abandoned subscription row(s)")
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                SecureLog.w(TAG, "abandoned add prune failed: ${e.javaClass.simpleName}")
+            }
             return subscriptionDao.getAll().filter { it.updateAlways }.map { it.id }
         }
 

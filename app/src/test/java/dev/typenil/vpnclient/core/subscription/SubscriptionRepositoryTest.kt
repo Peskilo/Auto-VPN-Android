@@ -201,7 +201,9 @@ class SubscriptionRepositoryTest {
     private inner class FakeTransactions : DbTransactionRunner {
         /** scheduler.cancel calls observed while a transaction block ran. */
         var cancelledInsideBlock = -1
+        var failWith: Throwable? = null
         override suspend fun <T> run(block: suspend () -> T): T {
+            failWith?.let { throw it }
             cancelledInsideBlock = scheduler.cancelled.size
             return block()
         }
@@ -828,6 +830,29 @@ class SubscriptionRepositoryTest {
         assertEquals(listOf(8L), repository.launchRefreshCandidates())
 
         assertEquals(setOf(8L), subscriptionDao.subs.keys)
+    }
+
+    @Test
+    fun `a failing prune still lists the update-always candidates`() = runTest {
+        seedSubscription(7L, "https://a.example.com/sub") // orphan: the prune will try (and fail) to delete it
+        seedSubscription(8L, "https://b.example.com/sub")
+        subscriptionDao.subs[8L] = subscriptionDao.subs.getValue(8L)
+            .copy(updateAlways = true, lastUpdatedAtEpochMs = 5L)
+        transactions.failWith = IllegalStateException("synthetic db failure")
+
+        assertEquals(listOf(8L), repository.launchRefreshCandidates())
+    }
+
+    @Test
+    fun `a cancelled prune cancels launch candidates instead of being swallowed`() = runTest {
+        seedSubscription(7L, "https://a.example.com/sub")
+        transactions.failWith = kotlinx.coroutines.CancellationException("synthetic")
+
+        try {
+            repository.launchRefreshCandidates()
+            org.junit.Assert.fail("cancellation must propagate")
+        } catch (_: kotlinx.coroutines.CancellationException) {
+        }
     }
 
     @Test
