@@ -219,6 +219,17 @@ class SubscriptionRepository
             return removed
         }
 
+        /**
+         * Ids for the refresh-on-launch pass. Prunes abandoned adds FIRST and only then
+         * reads the rows, so a leftover from an interrupted add can never be fetched —
+         * the order is the contract, not an accident of two coroutines racing.
+         */
+        suspend fun launchRefreshCandidates(): List<Long> {
+            val removed = pruneAbandonedAdds()
+            if (removed > 0) SecureLog.i(TAG, "pruned $removed abandoned subscription row(s)")
+            return subscriptionDao.getAll().filter { it.updateAlways }.map { it.id }
+        }
+
         /** Prefs, nodes and the row go together or not at all. */
         private suspend fun deleteRows(id: Long) {
             prefsMutex.withLock {

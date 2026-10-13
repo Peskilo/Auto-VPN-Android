@@ -815,6 +815,22 @@ class SubscriptionRepositoryTest {
     }
 
     @Test
+    fun `launch refresh candidates prune first so an orphan is never listed`() = runTest {
+        // Current code paths never write updateAlways without lastUpdatedAt, so the orphan
+        // is seeded directly: the contract must hold even if a row ever violates that.
+        seedSubscription(7L, "https://a.example.com/sub")
+        subscriptionDao.subs[7L] = subscriptionDao.subs.getValue(7L).copy(updateAlways = true)
+        seedSubscription(8L, "https://b.example.com/sub")
+        subscriptionDao.subs[8L] = subscriptionDao.subs.getValue(8L)
+            .copy(updateAlways = true, lastUpdatedAtEpochMs = 5L)
+        nodeDao.nodes["n"] = nodeEntity(uri("b.example.com", "B"), 8L).copy(id = "n")
+
+        assertEquals(listOf(8L), repository.launchRefreshCandidates())
+
+        assertEquals(setOf(8L), subscriptionDao.subs.keys)
+    }
+
+    @Test
     fun `startup prune and reconcile leave a row whose add is still in flight`() = runTest {
         server.enqueue(MockResponse().setBody(uri("a.example.com", "A")))
         val gate = CompletableDeferred<Unit>()

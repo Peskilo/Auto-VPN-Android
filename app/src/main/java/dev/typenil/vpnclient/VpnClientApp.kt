@@ -11,7 +11,6 @@ import dev.typenil.vpnclient.core.subscription.SubscriptionRepository
 import dev.typenil.vpnclient.core.vpn.ConnectionManager
 import dev.typenil.vpnclient.core.vpn.VpnConnectionState
 import dev.typenil.vpnclient.core.vpn.VpnNotification
-import dev.typenil.vpnclient.data.db.SubscriptionDao
 import dev.typenil.vpnclient.data.settings.SettingsRepository
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
@@ -26,9 +25,6 @@ class VpnClientApp : Application() {
 
     @Inject
     lateinit var applicationScope: CoroutineScope
-
-    @Inject
-    lateinit var subscriptionDao: SubscriptionDao
 
     @Inject
     lateinit var settings: SettingsRepository
@@ -47,7 +43,6 @@ class VpnClientApp : Application() {
         SecureLog.debugEnabled = BuildConfig.DEBUG
         createNotificationChannels()
         LibboxRuntime.init(this)
-        pruneAbandonedAdds()
         reconcileRefreshJobs()
         // Expiry scan is DB-only but serializes behind refresh() inside the
         // repository — launch it before the update-always network refreshes
@@ -55,20 +50,6 @@ class VpnClientApp : Application() {
         checkSubscriptionExpiry()
         refreshUpdateAlwaysSubscriptions()
         refreshRuleSetsWhileConnected()
-    }
-
-    /** One-off cleanup of rows left by an add that never finished (process killed mid-request). */
-    private fun pruneAbandonedAdds() {
-        applicationScope.launch {
-            try {
-                val removed = subscriptionRepository.pruneAbandonedAdds()
-                if (removed > 0) SecureLog.i("VpnClientApp", "pruned $removed abandoned subscription row(s)")
-            } catch (e: kotlinx.coroutines.CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                SecureLog.w("VpnClientApp", "abandoned add prune failed", e)
-            }
-        }
     }
 
     /**
@@ -136,17 +117,25 @@ class VpnClientApp : Application() {
      */
     private fun refreshUpdateAlwaysSubscriptions() {
         applicationScope.launch {
-            // The filter is a cheap pre-pass only — refreshOnLaunch re-checks
-            // eligibility on the CURRENT row at fetch entry, so a subscription
-            // disabled after this snapshot can never fetch.
-            subscriptionDao.getAll()
-                .filter { it.updateAlways }
-                .forEach { sub ->
-                    runCatching { subscriptionRepository.refreshOnLaunch(sub.id) }
-                        .onFailure {
-                            SecureLog.w("VpnClientApp", "update-always refresh failed sub=${sub.id}")
-                        }
-                }
+            // launchRefreshCandidates prunes abandoned adds before listing, so a
+            // leftover row is never refreshed. The updateAlways filter is a cheap
+            // pre-pass — refreshOnLaunch re-checks eligibility on the CURRENT row
+            // at fetch entry, so a subscription disabled after this snapshot can
+            // never fetch.
+            val ids = try {
+                subscriptionRepository.launchRefreshCandidates()
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                SecureLog.w("VpnClientApp", "launch refresh candidates failed", e)
+                return@launch
+            }
+            ids.forEach { id ->
+                runCatching { subscriptionRepository.refreshOnLaunch(id) }
+                    .onFailure {
+                        SecureLog.w("VpnClientApp", "update-always refresh failed sub=$id")
+                    }
+            }
         }
     }
 
