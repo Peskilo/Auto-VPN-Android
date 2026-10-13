@@ -16,6 +16,7 @@ import dev.typenil.vpnclient.core.subscription.model.isTunnelAllowed
 import dev.typenil.vpnclient.core.vpn.VpnError
 import dev.typenil.vpnclient.data.toDomain
 import dev.typenil.vpnclient.core.vpn.AppliedSessionConfig
+import dev.typenil.vpnclient.core.vpn.ConnectionHealth
 import dev.typenil.vpnclient.core.vpn.ConnectionManager
 import dev.typenil.vpnclient.core.vpn.PerAppMode
 import dev.typenil.vpnclient.core.vpn.UnderlyingTransport
@@ -50,6 +51,10 @@ data class HomeUiState(
     val bestLatencyNodeProtocol: String? = null,
     /** Measured delay for the selected node, or Auto's best measured candidate. */
     val selectedDelayMs: Int? = null,
+    /** Minutes since a REAL measurement that aged out of the fresh window; null when none exists or it is fresh. */
+    val selectedDelayStaleMinutes: Int? = null,
+    /** Live-path hint from fresh probe evidence; None outside Connected. */
+    val healthHint: HomeHealthHint = HomeHealthHint.None,
     val subscriptionName: String? = null,
     val routingMode: RouteMode? = RouteMode.ALL,
     val routingPending: Boolean = false,
@@ -84,7 +89,8 @@ internal fun HomeUiState.withAppliedServerOnRejection(): HomeUiState {
         else -> return this
     }
     return copy(selectedNodeName = node.name, selectedNodeProtocol = node.protocol.label,
-        autoSelected = node.id == NodeSelection.AUTO_ID, selectedDelayMs = null)
+        autoSelected = node.id == NodeSelection.AUTO_ID, selectedDelayMs = null,
+        selectedDelayStaleMinutes = null)
 }
 
 /** One row in the Home server picker. [id] is the raw `selected_node_id`
@@ -194,6 +200,7 @@ class HomeViewModel
                 settings.dnsProfile,
                 clockTicks,
                 connectionManager.selectionError,
+                connectionManager.health,
             ) { values ->
                 val connection = values[0] as VpnConnectionState
                 val selectedId = values[1] as String?
@@ -258,6 +265,11 @@ class HomeViewModel
                     .flatMap { it.items.asSequence() }
                     .firstOrNull { it.tag == selectedId }
                     ?.freshDelayMs(nowMs)
+                val selectedDelayStaleMinutes = staleLatencyAgeMinutes(
+                    if (auto) autoGroup?.items.orEmpty()
+                    else groups.asSequence().flatMap { it.items.asSequence() }.filter { it.tag == selectedId }.toList(),
+                    nowMs,
+                )
 
                 HomeUiState(
                     connection = connection,
@@ -277,6 +289,11 @@ class HomeViewModel
                     bestLatencyNodeName = if (auto) bestLatencyNodeName else null,
                     bestLatencyNodeProtocol = if (auto) bestNode?.protocol else null,
                     selectedDelayMs = selectedDelayMs,
+                    selectedDelayStaleMinutes = selectedDelayStaleMinutes,
+                    // Health expiry runs on the store's monotonic clock; the 30 s tick only re-evaluates.
+                    healthHint = homeHealthHint(
+                        connection, values[15] as ConnectionHealth, System.nanoTime() / 1_000_000,
+                    ),
                     noNodesAtAll = nodes.isEmpty(),
                     enabledSubscriptionCount = profiles.count {
                         it.enabled && !SubscriptionRepository.isManualSubscription(it.url)
