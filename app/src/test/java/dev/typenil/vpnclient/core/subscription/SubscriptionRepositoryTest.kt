@@ -776,6 +776,68 @@ class SubscriptionRepositoryTest {
     }
 
     @Test
+    fun `startup prune removes a row that never succeeded and has no nodes`() = runTest {
+        seedSubscription(7L, "https://a.example.com/sub")
+
+        assertEquals(1, repository.pruneAbandonedAdds())
+
+        assertTrue(subscriptionDao.subs.isEmpty())
+        assertEquals(listOf(7L), scheduler.cancelled)
+    }
+
+    @Test
+    fun `startup prune keeps a never-updated row that owns nodes`() = runTest {
+        seedSubscription(7L, "https://a.example.com/sub")
+        nodeDao.nodes["n"] = nodeEntity(uri("a.example.com", "A"), 7L).copy(id = "n")
+
+        assertEquals(0, repository.pruneAbandonedAdds())
+
+        assertEquals(setOf(7L), subscriptionDao.subs.keys)
+    }
+
+    @Test
+    fun `startup prune keeps an updated row whose nodes were all removed`() = runTest {
+        seedSubscription(7L, "https://a.example.com/sub")
+        subscriptionDao.subs[7L] = subscriptionDao.subs[7L]!!.copy(lastUpdatedAtEpochMs = 1_000L)
+
+        assertEquals(0, repository.pruneAbandonedAdds())
+
+        assertEquals(setOf(7L), subscriptionDao.subs.keys)
+    }
+
+    @Test
+    fun `startup prune never touches the manual sentinel`() = runTest {
+        seedSubscription(7L, SubscriptionRepository.MANUAL_SUBSCRIPTION_URL)
+
+        assertEquals(0, repository.pruneAbandonedAdds())
+
+        assertEquals(setOf(7L), subscriptionDao.subs.keys)
+    }
+
+    @Test
+    fun `startup prune and reconcile leave a row whose add is still in flight`() = runTest {
+        server.enqueue(MockResponse().setBody(uri("a.example.com", "A")))
+        val gate = CompletableDeferred<Unit>()
+        validator.gate = gate
+        settings.autoRefresh.value = 60
+        val job = launch { repository.add(addUrl, null, allowInsecureHttp = true) }
+        val deadline = System.currentTimeMillis() + 5_000
+        while (validator.calls == 0 && System.currentTimeMillis() < deadline) {
+            advanceUntilIdle()
+            Thread.sleep(20)
+        }
+        assertEquals(1, subscriptionDao.subs.size)
+
+        assertEquals(0, repository.pruneAbandonedAdds())
+        repository.reconcileRefreshSchedules(inheritingOnly = false)
+
+        assertEquals(1, subscriptionDao.subs.size)
+        assertTrue("pending row got a job", scheduler.scheduled.isEmpty())
+        job.cancelAndJoin()
+        assertTrue(subscriptionDao.subs.isEmpty())
+    }
+
+    @Test
     fun `a successful add keeps the row nodes schedule and becomes visible`() = runTest {
         server.enqueue(MockResponse().setBody(uri("a.example.com", "A")).setHeader("profile-update-interval", "2"))
 

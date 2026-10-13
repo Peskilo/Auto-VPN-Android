@@ -47,6 +47,7 @@ class VpnClientApp : Application() {
         SecureLog.debugEnabled = BuildConfig.DEBUG
         createNotificationChannels()
         LibboxRuntime.init(this)
+        pruneAbandonedAdds()
         reconcileRefreshJobs()
         // Expiry scan is DB-only but serializes behind refresh() inside the
         // repository — launch it before the update-always network refreshes
@@ -54,6 +55,20 @@ class VpnClientApp : Application() {
         checkSubscriptionExpiry()
         refreshUpdateAlwaysSubscriptions()
         refreshRuleSetsWhileConnected()
+    }
+
+    /** One-off cleanup of rows left by an add that never finished (process killed mid-request). */
+    private fun pruneAbandonedAdds() {
+        applicationScope.launch {
+            try {
+                val removed = subscriptionRepository.pruneAbandonedAdds()
+                if (removed > 0) SecureLog.i("VpnClientApp", "pruned $removed abandoned subscription row(s)")
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                SecureLog.w("VpnClientApp", "abandoned add prune failed", e)
+            }
+        }
     }
 
     /**

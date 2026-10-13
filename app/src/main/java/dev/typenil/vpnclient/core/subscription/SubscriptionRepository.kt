@@ -116,6 +116,9 @@ class SubscriptionRepository
          *  yet fail never shows up half-made. */
         private val pendingAdds = MutableStateFlow<Set<Long>>(emptySet())
 
+        /** Makes "insert the row + mark it pending" atomic towards [pruneAbandonedAdds]. */
+        private val addGate = Mutex()
+
         val profiles: Flow<List<SubscriptionProfile>> =
             combine(subscriptionDao.observeAll(), pendingAdds) { list, pending ->
                 list.filter { it.id !in pending }.map { it.toDomain() }
@@ -158,8 +161,10 @@ class SubscriptionRepository
                     announce = null,
                     fallbackUrl = null,
                 )
-            val id = subscriptionDao.insert(entity)
-            pendingAdds.update { it + id }
+            val id =
+                addGate.withLock {
+                    subscriptionDao.insert(entity).also { id -> pendingAdds.update { it + id } }
+                }
             try {
                 val result = refresh(id)
                 // All-or-nothing: the row exists only to give the fetch an id. A failed first
@@ -183,6 +188,35 @@ class SubscriptionRepository
             } catch (e: Exception) {
                 SecureLog.w(TAG, "add rollback failed sub=$id: ${e.javaClass.simpleName}")
             }
+        }
+
+        /**
+         * Startup cleanup for an add whose process died mid-request: a row that never
+         * refreshed successfully (`lastUpdatedAtEpochMs` is written only by markSuccess /
+         * updateUrlAndMarkSuccess) and owns no nodes can't be anything but a leftover.
+         * The manual sentinel and rows of adds still in flight are never touched.
+         */
+        suspend fun pruneAbandonedAdds(): Int {
+            val candidates =
+                addGate.withLock {
+                    val pending = pendingAdds.value
+                    subscriptionDao.getAll().filter { it.id !in pending }
+                }
+            var removed = 0
+            for (candidate in candidates) {
+                lockFor(candidate.id).withLock {
+                    val sub = subscriptionDao.get(candidate.id) ?: return@withLock
+                    if (isManualSubscription(sub.url) || sub.lastUpdatedAtEpochMs != null ||
+                        nodeDao.countForSubscription(sub.id) > 0
+                    ) {
+                        return@withLock
+                    }
+                    deleteRows(sub.id)
+                    scheduler.cancel(sub.id)
+                    removed++
+                }
+            }
+            return removed
         }
 
         /** Prefs, nodes and the row go together or not at all. */
@@ -972,6 +1006,9 @@ class SubscriptionRepository
                 lockFor(id).withLock {
                     try {
                         val current = subscriptionDao.get(id) ?: return@withLock
+                        // A row whose first add is still in flight may yet be rolled back —
+                        // it must not get a job (add schedules it itself on success).
+                        if (id in pendingAdds.value) return@withLock
                         // Only inheriting rows can observe a global change.
                         if (inheritingOnly &&
                             RefreshPolicy.fromStorage(
