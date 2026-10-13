@@ -336,6 +336,7 @@ class SubscriptionsViewModelTest {
 
             assertEquals(AddStatus.Failed(AddFailure(AddFailureKind.BadAddress)), viewModel.addStatus.value)
             assertNull(viewModel.uiState.value.pendingMessage)
+            assertTrue(subscriptionDao.subs.isEmpty())
         }
 
     @Test
@@ -668,8 +669,8 @@ class SubscriptionsViewModelTest {
                 assertTrue(viewModel.addStatus.value is AddStatus.Failed)
                 assertEquals(0, validatorCalls)
                 assertTrue(nodeDao.nodes.isEmpty())
-                // The repository retains a failed subscription row for retry;
-                // no parsed node or engine candidate may be committed.
+                // A failed first add leaves no subscription row and no node behind.
+                assertTrue(subscriptionDao.subs.isEmpty())
             } finally {
                 server.shutdown()
             }
