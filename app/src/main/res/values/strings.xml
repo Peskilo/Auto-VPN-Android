@@ -197,6 +197,9 @@
     <string name="afterglow_auto">AUTO</string>
     <string name="afterglow_status_reconnecting">Reconnecting…</string>
     <string name="afterglow_measured_latency">Latency · %1$d ms</string>
+    <string name="home_health_degraded">Connected, but one connection check failed</string>
+    <string name="home_health_unreachable">Connected, but connection checks failed</string>
+    <string name="home_latency_outdated">Latency outdated · %1$d min ago</string>
     <string name="afterglow_auto_best_latency">Min latency: %1$s (%2$d ms)</string>
     <string name="afterglow_your_connection">YOUR CONNECTION</string>
     <string name="afterglow_selected_server">SERVER</string>

@@ -14,7 +14,8 @@ import java.time.Instant
 private val exampleNode = NodeSummary("preview", "Example server", ProtocolType.OTHER, "example.invalid")
 
 @Composable
-private fun PreviewHome(connection: VpnConnectionState, auto: Boolean = false, empty: Boolean = false, longName: Boolean = false) {
+private fun PreviewHome(connection: VpnConnectionState, auto: Boolean = false, empty: Boolean = false, longName: Boolean = false,
+    hint: HomeHealthHint = HomeHealthHint.None, staleMinutes: Int? = null) {
     AfterglowHomeContent(
         ui =
             HomeUiState(
@@ -22,6 +23,8 @@ private fun PreviewHome(connection: VpnConnectionState, auto: Boolean = false, e
                 selectedNodeName = if (longName) "🌙 Amsterdam Premium Ultra Low Latency · Europe 04" else exampleNode.name,
                 autoSelected = auto,
                 noNodesAtAll = empty,
+                healthHint = hint,
+                selectedDelayStaleMinutes = staleMinutes,
                 serverOptions = if (empty) emptyList() else listOf(ServerOption(id = exampleNode.id, title = exampleNode.name)),
             ),
         onConnect = {},
@@ -91,4 +94,32 @@ private fun EmptyPreview() = PreviewHome(VpnConnectionState.Idle, empty = true)
 @Composable
 private fun DarkCompactPreview() {
     VPNClientTheme(themeMode = ThemeMode.Dark) { PreviewHome(VpnConnectionState.Idle) }
+}
+
+@Preview(name = "Connected degraded", showBackground = true, widthDp = 390, heightDp = 844)
+@Composable
+private fun DegradedPreview() =
+    PreviewHome(VpnConnectionState.Connected(exampleNode, Instant.EPOCH, null), hint = HomeHealthHint.Degraded)
+
+@Preview(name = "Connected unreachable stale ru dark", locale = "ru", showBackground = true, widthDp = 390, heightDp = 844)
+@Composable
+private fun UnreachableDarkPreview() {
+    VPNClientTheme(themeMode = ThemeMode.Dark) {
+        PreviewHome(VpnConnectionState.Connected(exampleNode, Instant.EPOCH, null),
+            hint = HomeHealthHint.Unreachable, staleMinutes = 9)
+    }
+}
+
+@Preview(name = "Connected unreachable font 2.0", showBackground = true, widthDp = 390, heightDp = 844, fontScale = 2f)
+@Composable
+private fun UnreachableLargeFontPreview() =
+    PreviewHome(VpnConnectionState.Connected(exampleNode, Instant.EPOCH, null),
+        hint = HomeHealthHint.Unreachable, staleMinutes = 9)
+
+@Preview(name = "Connected degraded ru font 2.0 dark", locale = "ru", showBackground = true, widthDp = 390, heightDp = 844, fontScale = 2f)
+@Composable
+private fun DegradedLargeFontRuPreview() {
+    VPNClientTheme(themeMode = ThemeMode.Dark) {
+        PreviewHome(VpnConnectionState.Connected(exampleNode, Instant.EPOCH, null), hint = HomeHealthHint.Degraded)
+    }
 }

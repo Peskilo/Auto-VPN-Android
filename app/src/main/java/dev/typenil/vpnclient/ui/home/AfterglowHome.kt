@@ -49,9 +49,9 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -83,6 +83,10 @@ internal fun VisualState.tone() = when (this) {
     VisualState.Connected -> StateTone.Positive
     VisualState.Error -> StateTone.Error
 }
+
+/** A Connected hero with a failed check turns amber (not red: the tunnel itself is up). */
+internal fun heroTone(state: VisualState, hint: HomeHealthHint) =
+    if (state == VisualState.Connected && hint != HomeHealthHint.None) StateTone.Progress else state.tone()
 
 internal fun frameTimeNanos(lastTickNanos: Long, measuredNanos: Long): Long = maxOf(lastTickNanos, measuredNanos)
 
@@ -148,7 +152,7 @@ internal fun AfterglowHomeContent(
                         tint = colors.ink)
                 }
             }
-            ConnectionHero(state.visual(), noServers, ui.selectedDelayMs)
+            ConnectionHero(state.visual(), noServers, ui.selectedDelayMs, ui.healthHint, ui.selectedDelayStaleMinutes)
             if (errorMessage != null) {
                 if (onDismissNotice != null) {
                     StatusNotice(errorMessage, onDismissNotice, false, null, stringResource(R.string.common_dismiss))
@@ -243,9 +247,14 @@ private fun ShortcutCard(label: Int, caption: String, server: Boolean, onClick: 
 }
 
 @Composable
-private fun ConnectionHero(state: VisualState, noServers: Boolean, delayMs: Int? = null) {
+private fun ConnectionHero(
+    state: VisualState, noServers: Boolean, delayMs: Int? = null,
+    healthHint: HomeHealthHint = HomeHealthHint.None, staleMinutes: Int? = null,
+) {
     val colors = AfterglowTheme.colors
-    val stateColors = colors.stateColors(state.tone())
+    val connected = state == VisualState.Connected
+    val hint = if (connected) healthHint else HomeHealthHint.None
+    val stateColors = colors.stateColors(heroTone(state, hint))
     val target = stateColors.hero
     // Token tween, not the default spring — hero color shifts are state
     // feedback, not physics; the standard duration matches the other state
@@ -297,10 +306,24 @@ private fun ConnectionHero(state: VisualState, noServers: Boolean, delayMs: Int?
                 fontWeight = FontWeight.Bold, letterSpacing = .8.sp,
                 modifier = Modifier.padding(bottom = 8.dp))
             // Only the state headline announces changes — never the latency/stats.
+            // The hint is read as part of the title (one Polite announcement, only when the hint
+            // changes); its own node is hidden so it is not spoken twice.
+            val hintText = hint.textRes()?.let { stringResource(it) }
             Text(headline, color = stateColors.onHero, fontWeight = FontWeight.Bold,
                 fontSize = 28.sp, lineHeight = 33.sp,
-                modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
+                modifier = Modifier.semantics {
+                    liveRegion = LiveRegionMode.Polite
+                    if (hintText != null) contentDescription = "$headline. $hintText"
+                })
+            if (hintText != null) {
+                Text(hintText, color = stateColors.onHero, fontSize = 12.sp, fontWeight = FontWeight.Medium,
+                    modifier = Modifier.padding(top = 6.dp).clearAndSetSemantics {})
+            }
             HeroLatency(delayMs, stateColors.onHero, Modifier.padding(top = 8.dp))
+            if (connected && staleMinutes != null && (delayMs == null || delayMs <= 0)) {
+                Text(stringResource(R.string.home_latency_outdated, staleMinutes),
+                    color = stateColors.onHeroMuted, fontSize = 11.sp, modifier = Modifier.padding(top = 8.dp))
+            }
         }
         Box(Modifier.fillMaxWidth().height(3.dp).align(Alignment.BottomCenter)
             .background(stateColors.line))

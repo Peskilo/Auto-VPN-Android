@@ -1,5 +1,7 @@
 package dev.typenil.vpnclient.ui.home
 
+import androidx.annotation.StringRes
+import dev.typenil.vpnclient.R
 import dev.typenil.vpnclient.core.engine.OutboundItemInfo
 import dev.typenil.vpnclient.core.engine.URLTEST_FRESH_WINDOW_MS
 import dev.typenil.vpnclient.core.vpn.ConnectionHealth
@@ -50,6 +52,14 @@ fun homeHealthHint(
         dns || traffic -> HomeHealthHint.Degraded
         else -> HomeHealthHint.None
     }
+}
+
+/** The single hero line for a hint; None has no text. */
+@StringRes
+internal fun HomeHealthHint.textRes(): Int? = when (this) {
+    HomeHealthHint.None -> null
+    HomeHealthHint.Degraded -> R.string.home_health_degraded
+    HomeHealthHint.Unreachable -> R.string.home_health_unreachable
 }
 
 /** Re-evaluation period of [healthHintFlow]: a 60 s probe expires at most this late. */

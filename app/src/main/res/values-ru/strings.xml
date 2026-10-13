@@ -198,6 +198,9 @@
     <string name="afterglow_auto">АВТО</string>
     <string name="afterglow_status_reconnecting">Переподключение…</string>
     <string name="afterglow_measured_latency">Задержка · %1$d мс</string>
+    <string name="home_health_degraded">Подключено, но одна из проверок соединения не прошла</string>
+    <string name="home_health_unreachable">Подключено, но проверки соединения не прошли</string>
+    <string name="home_latency_outdated">Задержка устарела · %1$d мин назад</string>
     <string name="afterglow_auto_best_latency">Мин. задержка: %1$s (%2$d мс)</string>
     <string name="afterglow_your_connection">ВАШЕ СОЕДИНЕНИЕ</string>
     <string name="afterglow_selected_server">СЕРВЕР</string>
