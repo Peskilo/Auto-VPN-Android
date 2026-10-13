@@ -16,7 +16,6 @@ import dev.typenil.vpnclient.core.subscription.model.isTunnelAllowed
 import dev.typenil.vpnclient.core.vpn.VpnError
 import dev.typenil.vpnclient.data.toDomain
 import dev.typenil.vpnclient.core.vpn.AppliedSessionConfig
-import dev.typenil.vpnclient.core.vpn.ConnectionHealth
 import dev.typenil.vpnclient.core.vpn.ConnectionManager
 import dev.typenil.vpnclient.core.vpn.PerAppMode
 import dev.typenil.vpnclient.core.vpn.UnderlyingTransport
@@ -200,7 +199,11 @@ class HomeViewModel
                 settings.dnsProfile,
                 clockTicks,
                 connectionManager.selectionError,
-                connectionManager.health,
+                healthHintFlow(
+                    connectionManager.state,
+                    connectionManager.health,
+                    nowMonotonicMs = { System.nanoTime() / 1_000_000 },
+                ),
             ) { values ->
                 val connection = values[0] as VpnConnectionState
                 val selectedId = values[1] as String?
@@ -290,10 +293,8 @@ class HomeViewModel
                     bestLatencyNodeProtocol = if (auto) bestNode?.protocol else null,
                     selectedDelayMs = selectedDelayMs,
                     selectedDelayStaleMinutes = selectedDelayStaleMinutes,
-                    // Health expiry runs on the store's monotonic clock; the 30 s tick only re-evaluates.
-                    healthHint = homeHealthHint(
-                        connection, values[15] as ConnectionHealth, System.nanoTime() / 1_000_000,
-                    ),
+                    // Expiry runs on the store's monotonic clock inside healthHintFlow (own 5 s tick).
+                    healthHint = values[15] as HomeHealthHint,
                     noNodesAtAll = nodes.isEmpty(),
                     enabledSubscriptionCount = profiles.count {
                         it.enabled && !SubscriptionRepository.isManualSubscription(it.url)

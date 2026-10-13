@@ -7,6 +7,11 @@ import dev.typenil.vpnclient.core.vpn.HealthFreshness
 import dev.typenil.vpnclient.core.vpn.HealthLevel
 import dev.typenil.vpnclient.core.vpn.HealthStatus
 import dev.typenil.vpnclient.core.vpn.VpnConnectionState
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flow
 
 /** What Home may say about the live path on top of "Connected". */
 enum class HomeHealthHint { None, Degraded, Unreachable }
@@ -46,6 +51,32 @@ fun homeHealthHint(
         else -> HomeHealthHint.None
     }
 }
+
+/** Re-evaluation period of [healthHintFlow]: a 60 s probe expires at most this late. */
+internal const val HEALTH_HINT_TICK_MS = 5_000L
+
+private val healthHintTicks: Flow<Unit> = flow {
+    while (true) {
+        emit(Unit)
+        delay(HEALTH_HINT_TICK_MS)
+    }
+}
+
+/**
+ * [homeHealthHint] as a flow. The health store only emits when it is written, so expiry (60 s TTL on
+ * the monotonic clock) needs its own [HEALTH_HINT_TICK_MS] tick; it lives here and not in the 30 s
+ * Home clock so the latency age keeps its slow cadence. `distinctUntilChanged` means the big Home
+ * combine re-emits only when the hint itself changes, never on a bare tick. The tick is cold: it runs
+ * only while Home's uiState is collected.
+ */
+fun healthHintFlow(
+    connection: Flow<VpnConnectionState>,
+    health: Flow<ConnectionHealth>,
+    nowMonotonicMs: () -> Long,
+    ticks: Flow<Unit> = healthHintTicks,
+): Flow<HomeHealthHint> =
+    combine(connection, health, ticks) { c, h, _ -> homeHealthHint(c, h, nowMonotonicMs()) }
+        .distinctUntilChanged()
 
 /**
  * Whole minutes since the newest real urltest measurement of [items], or null unless a measurement
